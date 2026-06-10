@@ -35,6 +35,11 @@ class GeneratedDashboardSmokeTests(unittest.TestCase):
             "Absorption ratio",
             "Pipeline rate",
             "Investment score",
+            "data-investment-sort=\"investmentScore\"",
+            "data-investment-sort=\"grossRentalYieldPct\"",
+            "investmentChartRowLimit",
+            "investmentYieldDemandChart: document.getElementById(\"investmentYieldDemandChart\")",
+            "investmentSupplyChart: document.getElementById(\"investmentSupplyChart\")",
         ]
 
         missing = _missing_tokens(HTML_PATH, markers)

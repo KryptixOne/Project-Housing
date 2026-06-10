@@ -1042,7 +1042,8 @@ def build_html(payload: dict) -> str:
     .investment-chart-panel {{
       display: grid;
       grid-template-rows: auto auto auto minmax(0, 1fr);
-      min-height: 780px;
+      height: clamp(440px, calc(100vh - 320px), 720px);
+      min-height: 0;
     }}
 
     .investment-note {{
@@ -1089,6 +1090,46 @@ def build_html(payload: dict) -> str:
       font-size: 11px;
     }}
 
+    .investment-table th {{
+      white-space: normal;
+      vertical-align: bottom;
+    }}
+
+    .table-sort {{
+      width: 100%;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-weight: 760;
+      text-align: right;
+      cursor: pointer;
+    }}
+
+    .table-sort:hover,
+    .table-sort.active {{
+      color: var(--blue);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }}
+
+    .table-sort::after {{
+      content: "";
+      display: inline-block;
+      width: 1.1em;
+      color: var(--muted);
+      text-align: right;
+    }}
+
+    .table-sort.active.sort-desc::after {{
+      content: " v";
+    }}
+
+    .table-sort.active.sort-asc::after {{
+      content: " ^";
+    }}
+
     .investment-table td:first-child {{
       max-width: 56px;
     }}
@@ -1102,8 +1143,9 @@ def build_html(payload: dict) -> str:
     .investment-dashboard {{
       min-height: 0;
       display: grid;
-      grid-template-rows: minmax(270px, 1fr) minmax(270px, 1fr);
-      overflow: visible;
+      grid-template-rows: 320px 320px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }}
 
     .investment-viz {{
@@ -1201,6 +1243,19 @@ def build_html(payload: dict) -> str:
       .housing-controls-panel,
       .housing-chart-panel {{
         min-height: 420px;
+      }}
+
+      .investment-panel,
+      .investment-chart-panel {{
+        height: auto;
+        max-height: none;
+        min-height: 420px;
+      }}
+
+      .investment-dashboard {{
+        grid-template-rows: minmax(260px, 320px) minmax(260px, 320px);
+        max-height: 620px;
+        overflow-y: auto;
       }}
 
       .housing-ratio-grid {{
@@ -1532,27 +1587,27 @@ def build_html(payload: dict) -> str:
           <table class="investment-table">
             <thead>
               <tr>
-                <th>Rank</th>
-                <th>Municipality</th>
-                <th>Investment score</th>
-                <th>Demand score</th>
-                <th>Supply score</th>
-                <th>Yield score</th>
-                <th>Affordability score</th>
-                <th>Risk/data score</th>
-                <th>Completeness</th>
-                <th>Start pop.</th>
-                <th>Pop CAGR</th>
-                <th>Abs. pop</th>
-                <th>Gross yield</th>
-                <th>Price/rent</th>
-                <th>Median purchase</th>
-                <th>Median rent</th>
-                <th>Absorption</th>
-                <th>Pipeline</th>
-                <th>Coverage</th>
-                <th>Data quality</th>
-                <th>Reason</th>
+                <th><button class="table-sort" type="button" data-investment-sort="rank">Rank</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="city">Municipality</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="investmentScore">Investment score</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="demandScore">Demand score</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="supplyScore">Supply score</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="yieldScore">Yield score</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="affordabilityScore">Affordability score</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="dataQualityScore">Risk/data score</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="scoreCompleteness">Completeness</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="startPopulation">Start pop.</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="populationCagrPct">Pop CAGR</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="absolutePopulationChange">Abs. pop</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="grossRentalYieldPct">Gross yield</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="priceToRentRatio">Price/rent</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="medianPurchasePrice">Median purchase</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="medianAskingRent">Median rent</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="absorptionRatioScoreValue">Absorption</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="pipelineRateScoreValue">Pipeline</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="coverageLevel">Coverage</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="dataQualityLabel">Data quality</button></th>
+                <th><button class="table-sort" type="button" data-investment-sort="reasonLabel">Reason</button></th>
               </tr>
             </thead>
             <tbody id="investmentBody"></tbody>
@@ -1566,7 +1621,7 @@ def build_html(payload: dict) -> str:
           <span id="investmentPeriod" class="count"></span>
         </div>
         <div class="view-note">
-          Charts render the top filtered municipalities to stay readable. Tooltips show the underlying metrics behind each point.
+          Charts render the first 15 municipalities in the current Investment table sort. The diagnostics panel scrolls independently from the page. Tooltips show the underlying metrics behind each point.
         </div>
         <div class="investment-dashboard">
           <section class="investment-viz">
@@ -1690,6 +1745,7 @@ def build_html(payload: dict) -> str:
     const metadata = payload.metadata;
     const colors = ["#3168a6", "#3e7b4f", "#bc6c25", "#7057a3", "#207c7c", "#a64035", "#6f6a5f"];
     const stablePriceYoYThreshold = 1.0;
+    const investmentChartRowLimit = 15;
     const investmentWeights = {{
       demand: 0.30,
       supply: 0.25,
@@ -1756,6 +1812,8 @@ def build_html(payload: dict) -> str:
       minPopulation: "",
       maxPopulation: "",
       granularityMode: "best",
+      investmentSortKey: "investmentScore",
+      investmentSortDirection: "desc",
       opportunitySignalMetric: "best",
       opportunityMinGrowth: 0,
       opportunityMaxPriceGrowth: 1,
@@ -1852,6 +1910,19 @@ def build_html(payload: dict) -> str:
           render();
         }});
       }});
+      document.querySelectorAll("[data-investment-sort]").forEach(button => {{
+        button.addEventListener("click", () => {{
+          const key = button.dataset.investmentSort;
+          if (state.investmentSortKey === key) {{
+            state.investmentSortDirection = state.investmentSortDirection === "desc" ? "asc" : "desc";
+          }} else {{
+            state.investmentSortKey = key;
+            state.investmentSortDirection = investmentDefaultSortDirection(key);
+          }}
+          state.activeTab = "investment";
+          render();
+        }});
+      }});
 
       elements.search.addEventListener("input", event => {{
         state.search = event.target.value.trim().toLowerCase();
@@ -1875,6 +1946,7 @@ def build_html(payload: dict) -> str:
       }});
       elements.sortMode.addEventListener("change", event => {{
         state.sortMode = event.target.value;
+        syncInvestmentSortFromSortMode(state.sortMode);
         state.selected.clear();
         render();
       }});
@@ -1941,11 +2013,13 @@ def build_html(payload: dict) -> str:
         state.rowLimit = "25";
         state.populationBand = "all";
         state.minPopulation = "";
-      state.maxPopulation = "";
-      state.granularityMode = "best";
-      state.opportunitySignalMetric = "best";
-      state.opportunityMinGrowth = 0;
-      state.opportunityMaxPriceGrowth = stablePriceYoYThreshold;
+        state.maxPopulation = "";
+        state.granularityMode = "best";
+        state.investmentSortKey = "investmentScore";
+        state.investmentSortDirection = "desc";
+        state.opportunitySignalMetric = "best";
+        state.opportunityMinGrowth = 0;
+        state.opportunityMaxPriceGrowth = stablePriceYoYThreshold;
         state.selected.clear();
         elements.search.value = "";
         elements.startYear.value = state.startYear;
@@ -2138,7 +2212,7 @@ def build_html(payload: dict) -> str:
       ]);
       elements.investmentActiveFilters.innerHTML = activeFilterMarkup([
         ...common,
-        ["Sort", sortModeLabel()],
+        ["Investment sort", investmentSortLabel()],
         ["Score", "Demand, supply, yield, affordability, data risk"]
       ]);
       elements.housingActiveFilters.innerHTML = activeFilterMarkup([
@@ -2201,6 +2275,73 @@ def build_html(payload: dict) -> str:
         rent: "Asking-rent signal"
       }};
       return labels[state.opportunitySignalMetric] || labels.best;
+    }}
+
+    function investmentSortSpecs() {{
+      return {{
+        rank: {{ label: "Rank", type: "number", value: row => row.defaultInvestmentRank }},
+        city: {{ label: "Municipality", type: "text", value: row => row.city }},
+        investmentScore: {{ label: "Investment score", type: "number", value: row => row.investmentScore }},
+        demandScore: {{ label: "Demand score", type: "number", value: row => row.demandScore }},
+        supplyScore: {{ label: "Supply score", type: "number", value: row => row.supplyScore }},
+        yieldScore: {{ label: "Yield score", type: "number", value: row => row.yieldScore }},
+        affordabilityScore: {{ label: "Affordability score", type: "number", value: row => row.affordabilityScore }},
+        dataQualityScore: {{ label: "Risk/data score", type: "number", value: row => row.dataQualityScore }},
+        scoreCompleteness: {{ label: "Completeness", type: "number", value: row => row.scoreCompleteness }},
+        startPopulation: {{ label: "Start population", type: "number", value: row => row.startPopulation }},
+        populationCagrPct: {{ label: "Population CAGR", type: "number", value: row => row.populationCagrPct }},
+        absolutePopulationChange: {{ label: "Absolute population change", type: "number", value: row => row.absolutePopulationChange }},
+        grossRentalYieldPct: {{ label: "Gross rental yield", type: "number", value: row => row.grossRentalYieldPct }},
+        priceToRentRatio: {{ label: "Price-to-rent ratio", type: "number", value: row => row.priceToRentRatio }},
+        medianPurchasePrice: {{ label: "Median purchase price", type: "number", value: row => row.medianPurchasePrice }},
+        medianAskingRent: {{ label: "Median asking rent", type: "number", value: row => row.medianAskingRent }},
+        absorptionRatioScoreValue: {{ label: "Absorption", type: "number", value: row => row.absorptionRatioScoreValue }},
+        pipelineRateScoreValue: {{ label: "Pipeline", type: "number", value: row => row.pipelineRateScoreValue }},
+        coverageLevel: {{ label: "Coverage", type: "text", value: row => row.coverageLevel || "" }},
+        dataQualityLabel: {{ label: "Data quality", type: "text", value: row => row.dataQuality?.label || "" }},
+        reasonLabel: {{ label: "Reason", type: "text", value: row => row.reasonLabel || "" }}
+      }};
+    }}
+
+    function investmentDefaultSortDirection(key) {{
+      return key === "city" || key === "coverageLevel" || key === "dataQualityLabel" || key === "reasonLabel" ? "asc" : "desc";
+    }}
+
+    function syncInvestmentSortFromSortMode(sortMode) {{
+      const map = {{
+        "abs-desc": ["absolutePopulationChange", "desc"],
+        "cagr-desc": ["populationCagrPct", "desc"],
+        "pct-desc": ["populationCagrPct", "desc"],
+        "cagr-asc": ["populationCagrPct", "asc"],
+        "start-pop-desc": ["startPopulation", "desc"],
+        "investment-score-desc": ["investmentScore", "desc"],
+        "demand-score-desc": ["demandScore", "desc"],
+        "supply-score-desc": ["supplyScore", "desc"],
+        "yield-score-desc": ["grossRentalYieldPct", "desc"],
+        "price-to-rent-asc": ["priceToRentRatio", "asc"],
+        "absorption-desc": ["absorptionRatioScoreValue", "desc"],
+        "pipeline-asc": ["pipelineRateScoreValue", "asc"],
+        "data-quality-desc": ["dataQualityScore", "desc"]
+      }};
+      const selected = map[sortMode];
+      if (!selected) return;
+      state.investmentSortKey = selected[0];
+      state.investmentSortDirection = selected[1];
+    }}
+
+    function investmentSortLabel() {{
+      const spec = investmentSortSpecs()[state.investmentSortKey];
+      const direction = state.investmentSortDirection === "asc" ? "low to high" : "high to low";
+      return `${{spec?.label || state.investmentSortKey}} (${{direction}})`;
+    }}
+
+    function syncInvestmentSortHeaders() {{
+      document.querySelectorAll("[data-investment-sort]").forEach(button => {{
+        const isActive = button.dataset.investmentSort === state.investmentSortKey;
+        button.classList.toggle("active", isActive);
+        button.classList.toggle("sort-desc", isActive && state.investmentSortDirection === "desc");
+        button.classList.toggle("sort-asc", isActive && state.investmentSortDirection === "asc");
+      }});
     }}
 
     function granularityModeLabel() {{
@@ -2759,28 +2900,41 @@ def build_html(payload: dict) -> str:
       elements.investmentCount.textContent = `${{rows.length.toLocaleString()}} municipalities`;
       renderInvestmentSummary(rows);
       renderInvestmentTable(visible, rows.length);
-      renderInvestmentYieldDemandChart(elements.investmentYieldDemandChart, rows.slice(0, 120));
-      renderInvestmentSupplyChart(elements.investmentSupplyChart, rows.slice(0, 120));
+      renderInvestmentYieldDemandChart(elements.investmentYieldDemandChart, rows.slice(0, investmentChartRowLimit));
+      renderInvestmentSupplyChart(elements.investmentSupplyChart, rows.slice(0, investmentChartRowLimit));
     }}
 
     function computeInvestmentRows(rankings) {{
       const rows = rankings.map(row => computeInvestmentRow(row)).filter(Boolean);
+      rows.sort(compareDefaultInvestmentRows);
+      rows.forEach((row, index) => row.defaultInvestmentRank = index + 1);
       rows.sort(compareInvestmentRows);
       rows.forEach((row, index) => row.rank = index + 1);
       return rows;
     }}
 
+    function compareDefaultInvestmentRows(a, b) {{
+      return b.investmentScore - a.investmentScore ||
+        b.scoreCompleteness - a.scoreCompleteness ||
+        a.city.localeCompare(b.city);
+    }}
+
     function compareInvestmentRows(a, b) {{
-      if (state.sortMode === "demand-score-desc") return nullableDesc(a.demandScore, b.demandScore) || b.investmentScore - a.investmentScore;
-      if (state.sortMode === "supply-score-desc") return nullableDesc(a.supplyScore, b.supplyScore) || b.investmentScore - a.investmentScore;
-      if (state.sortMode === "yield-score-desc") return nullableDesc(a.grossRentalYieldPct, b.grossRentalYieldPct) || b.investmentScore - a.investmentScore;
-      if (state.sortMode === "price-to-rent-asc") return nullableAsc(a.priceToRentRatio, b.priceToRentRatio) || b.investmentScore - a.investmentScore;
-      if (state.sortMode === "population-cagr-desc" || state.sortMode === "cagr-desc") return b.populationCagrPct - a.populationCagrPct || b.investmentScore - a.investmentScore;
-      if (state.sortMode === "abs-desc") return b.absolutePopulationChange - a.absolutePopulationChange || b.investmentScore - a.investmentScore;
-      if (state.sortMode === "absorption-desc") return nullableDesc(a.absorptionRatioScoreValue, b.absorptionRatioScoreValue) || b.investmentScore - a.investmentScore;
-      if (state.sortMode === "pipeline-asc") return nullableAsc(a.pipelineRateScoreValue, b.pipelineRateScoreValue) || b.investmentScore - a.investmentScore;
-      if (state.sortMode === "data-quality-desc") return b.dataQualityScore - a.dataQualityScore || b.investmentScore - a.investmentScore;
-      return b.investmentScore - a.investmentScore || b.scoreCompleteness - a.scoreCompleteness || a.city.localeCompare(b.city);
+      const specs = investmentSortSpecs();
+      const spec = specs[state.investmentSortKey] || specs.investmentScore;
+      const direction = state.investmentSortDirection === "asc" ? 1 : -1;
+      const primary = compareInvestmentValues(spec.value(a), spec.value(b), spec.type, direction);
+      return primary || compareDefaultInvestmentRows(a, b);
+    }}
+
+    function compareInvestmentValues(aValue, bValue, type, direction) {{
+      const aMissing = aValue == null || (typeof aValue === "number" && !Number.isFinite(aValue));
+      const bMissing = bValue == null || (typeof bValue === "number" && !Number.isFinite(bValue));
+      if (aMissing && bMissing) return 0;
+      if (aMissing) return 1;
+      if (bMissing) return -1;
+      if (type === "text") return String(aValue).localeCompare(String(bValue)) * direction;
+      return (aValue - bValue) * direction;
     }}
 
     function computeInvestmentRow(row) {{
@@ -3162,6 +3316,7 @@ def build_html(payload: dict) -> str:
 
     function renderInvestmentTable(rows, filteredCount) {{
       elements.investmentBody.textContent = "";
+      syncInvestmentSortHeaders();
       if (!rows.length) {{
         elements.investmentBody.innerHTML = `<tr><td colspan="21">No municipalities match the active filters.</td></tr>`;
         return;
