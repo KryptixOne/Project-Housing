@@ -5,6 +5,7 @@ from pathlib import Path
 
 INPUT_PATH = Path("data/real/inkar_2025_municipality_population_observations.csv")
 HOUSING_PRICE_INPUT_PATH = Path("data/real/neighborhood_housing_prices.csv")
+MARKET_INDICATOR_INPUT_PATH = Path("data/real/inkar_2025_municipality_market_indicators.csv")
 OUTPUT_PATH = Path("output/population_growth_dashboard.html")
 
 PRICE_METRIC_COLUMNS = {
@@ -34,6 +35,7 @@ def main() -> int:
         raise SystemExit(f"No population observations found in {INPUT_PATH}")
 
     housing_prices = read_housing_price_observations()
+    market_indicators = read_market_indicator_observations()
     years = sorted({item["year"] for item in observations})
     cities = sorted({item["city"] for item in observations})
     default_start = max(years[0], years[-1] - 9)
@@ -50,9 +52,12 @@ def main() -> int:
             "default_end": years[-1],
             "generated_from": str(INPUT_PATH),
             "housing_price_input": str(HOUSING_PRICE_INPUT_PATH),
+            "market_indicator_input": str(MARKET_INDICATOR_INPUT_PATH),
             "housing_price_loaded": bool(housing_prices),
+            "market_indicators_loaded": bool(market_indicators),
         },
         "housing_prices": housing_prices,
+        "market_indicators": market_indicators,
     }
 
     html = build_html(payload)
@@ -92,6 +97,49 @@ def read_housing_price_observations() -> list:
             for metric in PRICE_METRIC_COLUMNS:
                 observation[metric] = parse_optional_float(row.get(metric, ""))
             observations.append(observation)
+
+    return observations
+
+
+def read_market_indicator_observations() -> list:
+    if not MARKET_INDICATOR_INPUT_PATH.exists():
+        return []
+
+    observations = []
+    with MARKET_INDICATOR_INPUT_PATH.open("r", newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        required = {
+            "city",
+            "city_id",
+            "year",
+            "metric",
+            "value",
+            "unit",
+            "source",
+            "coverage_level",
+            "source_area",
+        }
+        missing = required.difference(reader.fieldnames or [])
+        if missing:
+            raise SystemExit(
+                f"{MARKET_INDICATOR_INPUT_PATH} is missing required columns: "
+                f"{', '.join(sorted(missing))}"
+            )
+
+        for row in reader:
+            observations.append(
+                {
+                    "city": row["city"].strip(),
+                    "city_id": row["city_id"].strip(),
+                    "year": int(row["year"]),
+                    "metric": row["metric"].strip(),
+                    "value": float(row["value"]),
+                    "unit": row["unit"].strip(),
+                    "source": row["source"].strip(),
+                    "coverage_level": row["coverage_level"].strip(),
+                    "source_area": row["source_area"].strip(),
+                }
+            )
 
     return observations
 
@@ -220,7 +268,7 @@ def build_html(payload: dict) -> str:
 
     .toolbar {{
       display: grid;
-      grid-template-columns: minmax(170px, 1.2fr) repeat(9, minmax(90px, auto));
+      grid-template-columns: minmax(170px, 1.2fr) repeat(10, minmax(90px, auto));
       gap: 12px;
       padding: 10px 24px;
       align-items: end;
@@ -741,7 +789,7 @@ def build_html(payload: dict) -> str:
 
     .housing-controls-panel,
     .housing-chart-panel {{
-      min-height: 780px;
+      min-height: 960px;
     }}
 
     .housing-controls {{
@@ -811,7 +859,7 @@ def build_html(payload: dict) -> str:
     .housing-dashboard {{
       min-height: 0;
       display: grid;
-      grid-template-rows: minmax(170px, 1fr) minmax(190px, 1.05fr) minmax(170px, 0.85fr);
+      grid-template-rows: minmax(170px, 0.9fr) minmax(190px, 1fr) minmax(190px, 0.95fr) minmax(170px, 0.85fr);
       overflow: visible;
     }}
 
@@ -841,6 +889,35 @@ def build_html(payload: dict) -> str:
       min-height: 0;
       padding: 6px 16px 8px;
       overflow: hidden;
+    }}
+
+    .housing-ratio-grid {{
+      min-height: 0;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      padding: 6px 16px 10px;
+    }}
+
+    .housing-ratio-card {{
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      border: 1px solid #ece8de;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }}
+
+    .housing-ratio-title {{
+      padding: 7px 10px 0;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }}
+
+    .housing-ratio-card .housing-chart-frame {{
+      padding: 4px 10px 8px;
     }}
 
     .housing-stats-legend {{
@@ -945,12 +1022,109 @@ def build_html(payload: dict) -> str:
       background: var(--teal);
     }}
 
+    .signal-rising {{
+      background: var(--orange);
+    }}
+
     .opportunity-table td:first-child {{
       max-width: 170px;
     }}
 
     .opportunity-chart-panel {{
       grid-template-rows: auto auto minmax(0, 1fr) auto;
+    }}
+
+    .investment-page {{
+      grid-template-columns: minmax(520px, 0.95fr) minmax(0, 1.05fr);
+    }}
+
+    .investment-panel,
+    .investment-chart-panel {{
+      display: grid;
+      grid-template-rows: auto auto auto minmax(0, 1fr);
+      min-height: 780px;
+    }}
+
+    .investment-note {{
+      padding: 9px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfaf7;
+      color: var(--muted);
+      font-size: 12px;
+    }}
+
+    .investment-summary {{
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 1px;
+      background: var(--line);
+      border-bottom: 1px solid var(--line);
+    }}
+
+    .investment-stat {{
+      background: #fbfaf7;
+      padding: 10px 12px;
+      min-width: 0;
+    }}
+
+    .investment-stat-value {{
+      font-size: 17px;
+      font-weight: 760;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
+
+    .investment-stat-label {{
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
+
+    .investment-table th,
+    .investment-table td {{
+      font-size: 11px;
+    }}
+
+    .investment-table td:first-child {{
+      max-width: 56px;
+    }}
+
+    .investment-table td:nth-child(2) {{
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
+
+    .investment-dashboard {{
+      min-height: 0;
+      display: grid;
+      grid-template-rows: minmax(270px, 1fr) minmax(270px, 1fr);
+      overflow: visible;
+    }}
+
+    .investment-viz {{
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      border-bottom: 1px solid var(--line);
+    }}
+
+    .investment-viz-head {{
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 16px 0;
+    }}
+
+    .investment-viz-head h3 {{
+      margin: 0;
+      font-size: 13px;
+      font-weight: 760;
     }}
 
     .chart-tooltip {{
@@ -1029,6 +1203,10 @@ def build_html(payload: dict) -> str:
         min-height: 420px;
       }}
 
+      .housing-ratio-grid {{
+        grid-template-columns: 1fr;
+      }}
+
       .chart-frame {{
         min-height: 340px;
       }}
@@ -1082,7 +1260,8 @@ def build_html(payload: dict) -> str:
     <nav class="tabs" aria-label="Pages">
       <button id="populationTab" type="button" class="tab-button active" data-tab="population">Population Growth</button>
       <button id="classificationTab" type="button" class="tab-button" data-tab="classification">Growth Classification</button>
-      <button id="opportunityTab" type="button" class="tab-button" data-tab="opportunity">Growth Price Signals</button>
+      <button id="opportunityTab" type="button" class="tab-button" data-tab="opportunity">Growth + Price/Rent Signals</button>
+      <button id="investmentTab" type="button" class="tab-button" data-tab="investment">Investment Potential</button>
       <button id="housingTab" type="button" class="tab-button" data-tab="housing">Housing Price Trends</button>
     </nav>
 
@@ -1109,6 +1288,14 @@ def build_html(payload: dict) -> str:
           <option value="start-pop-desc">Start population</option>
           <option value="end-pop-desc">End population</option>
           <option value="median-price-growth-desc">Median housing price YoY</option>
+          <option value="investment-score-desc">Investment score</option>
+          <option value="demand-score-desc">Demand score</option>
+          <option value="supply-score-desc">Supply constraint score</option>
+          <option value="yield-score-desc">Gross rental yield</option>
+          <option value="price-to-rent-asc">Price-to-rent ratio</option>
+          <option value="absorption-desc">Absorption ratio</option>
+          <option value="pipeline-asc">Pipeline rate</option>
+          <option value="data-quality-desc">Data quality</option>
         </select>
       </label>
       <label>
@@ -1140,6 +1327,13 @@ def build_html(payload: dict) -> str:
         </select>
       </label>
       <label>
+        Granularity
+        <select id="granularityMode">
+          <option value="best">Best available data</option>
+          <option value="conservative">Conservative comparable mode</option>
+        </select>
+      </label>
+      <label>
         View
         <span class="segmented" role="group" aria-label="Chart view">
           <button id="indexView" type="button" class="active" data-view="index">Indexed</button>
@@ -1159,6 +1353,20 @@ def build_html(payload: dict) -> str:
         <div><b>Mean housing price</b>: average value across source records for a year.</div>
         <div><b>Standard deviation</b>: spread of housing values across source records.</div>
         <div><b>Housing price YoY</b>: annualized median-price change across the selected years.</div>
+        <div><b>Gross rental yield</b>: annual rent per m2 divided by purchase price per m2.</div>
+        <div><b>Price-to-rent ratio</b>: purchase price per m2 divided by annual rent per m2.</div>
+        <div><b>Absorption ratio</b>: population change divided by completed apartments.</div>
+        <div><b>Pipeline rate</b>: building permits divided by completed apartments.</div>
+        <div><b>Building permits per 1,000 residents</b>: supply pipeline intensity.</div>
+        <div><b>Completed apartments per 1,000 residents</b>: recent new housing supply intensity.</div>
+        <div><b>Investment score</b>: weighted, explainable score from demand, supply, yield, affordability, and data risk.</div>
+        <div><b>Demand score</b>: population CAGR, absolute growth, and starting population base.</div>
+        <div><b>Supply constraint score</b>: absorption pressure adjusted by pipeline rate.</div>
+        <div><b>Yield score</b>: gross rental yield and price-to-rent reasonableness.</div>
+        <div><b>Affordability score</b>: purchase-price discipline relative to rent and demand.</div>
+        <div><b>Data quality / risk score</b>: completeness, granularity, and missing yield/supply risk.</div>
+        <div><b>Coverage level / granularity</b>: whether observations are municipality, district, or fine-grained area records.</div>
+        <div><b>Conservative comparable mode</b>: penalizes less comparable fine-grained and fallback records in rankings.</div>
         <div><b>Population bands</b>: small &lt;10k, medium 10k-100k, large 100k-1M, very large &gt;1M.</div>
         <div><b>Indexed mode</b>: sets each selected series to 100 in the first selected year.</div>
       </div>
@@ -1243,15 +1451,23 @@ def build_html(payload: dict) -> str:
           <span id="opportunityCount" class="count"></span>
         </div>
         <div class="opportunity-note">
-          Screens cities with rising population and stable or decreasing median housing-price YoY over the selected years. Decreasing prices are highlighted separately. Treat this as a signal for investigation, not a valuation model.
+          Screens cities with rising population and stable or decreasing purchase-price or asking-rent signals over the selected years. The chart shows every city with the selected signal so the highlighted candidates stay in context.
         </div>
         <div class="opportunity-controls">
+          <label>
+            Signal metric
+            <select id="opportunitySignalMetric">
+              <option value="best">Best available price/rent signal</option>
+              <option value="purchase">Purchase-price signal only</option>
+              <option value="rent">Asking-rent signal only</option>
+            </select>
+          </label>
           <label>
             Min pop. CAGR %
             <input id="opportunityMinGrowth" type="number" step="0.1" value="0" inputmode="decimal">
           </label>
           <label>
-            Max price YoY %
+            Max signal YoY %
             <input id="opportunityMaxPriceGrowth" type="number" step="0.1" value="1" inputmode="decimal">
           </label>
         </div>
@@ -1265,9 +1481,17 @@ def build_html(payload: dict) -> str:
                 <th>Start pop.</th>
                 <th>Abs. pop</th>
                 <th>Pop CAGR</th>
-                <th>Start median</th>
-                <th>End median</th>
-                <th>Price YoY</th>
+                <th>Signal basis</th>
+                <th>Start signal</th>
+                <th>End signal</th>
+                <th>Signal YoY</th>
+                <th>Median rent</th>
+                <th>Rent YoY</th>
+                <th>Gross yield</th>
+                <th>Price/rent</th>
+                <th>Absorption</th>
+                <th>Supply pressure</th>
+                <th>Coverage</th>
                 <th>Spread</th>
                 <th>Quality</th>
               </tr>
@@ -1290,6 +1514,80 @@ def build_html(payload: dict) -> str:
           <div id="opportunityTooltip" class="chart-tooltip" hidden></div>
         </div>
         <div id="opportunityLegend" class="legend"></div>
+      </section>
+    </main>
+
+    <main id="investmentPage" class="page investment-page" hidden>
+      <div id="investmentActiveFilters" class="active-filters"></div>
+      <section class="panel investment-panel">
+        <div class="panel-head">
+          <h2>Investment Potential</h2>
+          <span id="investmentCount" class="count"></span>
+        </div>
+        <div class="investment-note">
+          Ranks municipalities with an explainable score. Missing fundamentals are shown as unavailable and reduce score completeness; asking rent is never treated as purchase price.
+        </div>
+        <div id="investmentSummary" class="investment-summary"></div>
+        <div class="table-wrap">
+          <table class="investment-table">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Municipality</th>
+                <th>Investment score</th>
+                <th>Demand score</th>
+                <th>Supply score</th>
+                <th>Yield score</th>
+                <th>Affordability score</th>
+                <th>Risk/data score</th>
+                <th>Completeness</th>
+                <th>Start pop.</th>
+                <th>Pop CAGR</th>
+                <th>Abs. pop</th>
+                <th>Gross yield</th>
+                <th>Price/rent</th>
+                <th>Median purchase</th>
+                <th>Median rent</th>
+                <th>Absorption</th>
+                <th>Pipeline</th>
+                <th>Coverage</th>
+                <th>Data quality</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody id="investmentBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel investment-chart-panel">
+        <div class="panel-head">
+          <h2>Investment Diagnostics</h2>
+          <span id="investmentPeriod" class="count"></span>
+        </div>
+        <div class="view-note">
+          Charts render the top filtered municipalities to stay readable. Tooltips show the underlying metrics behind each point.
+        </div>
+        <div class="investment-dashboard">
+          <section class="investment-viz">
+            <div class="investment-viz-head">
+              <h3>Yield vs Demand</h3>
+              <span class="count">x: gross yield, y: population CAGR</span>
+            </div>
+            <div class="chart-frame">
+              <svg id="investmentYieldDemandChart" role="img" aria-label="Gross rental yield versus population CAGR"></svg>
+            </div>
+          </section>
+          <section class="investment-viz">
+            <div class="investment-viz-head">
+              <h3>Supply-Demand Pressure</h3>
+              <span class="count">x: population CAGR, y: absorption ratio</span>
+            </div>
+            <div class="chart-frame">
+              <svg id="investmentSupplyChart" role="img" aria-label="Population CAGR versus absorption ratio"></svg>
+            </div>
+          </section>
+        </div>
       </section>
     </main>
 
@@ -1335,6 +1633,26 @@ def build_html(payload: dict) -> str:
             </div>
             <div id="housingStatsLegend" class="housing-stats-legend"></div>
           </section>
+          <section class="housing-viz">
+            <div class="housing-viz-head">
+              <h3>Yield and Price-to-Rent Over Years</h3>
+              <span class="count">computed only from overlapping purchase + rent years</span>
+            </div>
+            <div class="housing-ratio-grid">
+              <div class="housing-ratio-card">
+                <div class="housing-ratio-title">Gross rental yield</div>
+                <div class="housing-chart-frame">
+                  <svg id="housingYieldChart" role="img" aria-label="Selected city gross rental yield over years"></svg>
+                </div>
+              </div>
+              <div class="housing-ratio-card">
+                <div class="housing-ratio-title">Price-to-rent ratio</div>
+                <div class="housing-chart-frame">
+                  <svg id="housingPriceRentChart" role="img" aria-label="Selected city price-to-rent ratio over years"></svg>
+                </div>
+              </div>
+            </div>
+          </section>
           <div class="housing-summary-wrap">
             <table class="housing-summary-table">
               <thead>
@@ -1343,11 +1661,12 @@ def build_html(payload: dict) -> str:
                   <th>Population</th>
                   <th>Pop YoY change</th>
                   <th>Pop YoY %</th>
-                  <th>Median price</th>
-                  <th>Mean price</th>
-                  <th>Std dev</th>
-                  <th>Median YoY change</th>
-                  <th>Median YoY %</th>
+                  <th>Purchase median</th>
+                  <th>Asking rent</th>
+                  <th>Gross yield</th>
+                  <th>Price/rent</th>
+                  <th>Purchase YoY</th>
+                  <th>Rent YoY</th>
                 </tr>
               </thead>
               <tbody id="housingSummaryBody"></tbody>
@@ -1367,9 +1686,17 @@ def build_html(payload: dict) -> str:
     const payload = JSON.parse(document.getElementById("population-data").textContent);
     const observations = payload.observations;
     const housingPrices = payload.housing_prices || [];
+    const marketIndicators = payload.market_indicators || [];
     const metadata = payload.metadata;
     const colors = ["#3168a6", "#3e7b4f", "#bc6c25", "#7057a3", "#207c7c", "#a64035", "#6f6a5f"];
     const stablePriceYoYThreshold = 1.0;
+    const investmentWeights = {{
+      demand: 0.30,
+      supply: 0.25,
+      yield: 0.20,
+      affordability: 0.15,
+      dataQuality: 0.10
+    }};
 
     const byCity = new Map();
     const years = Array.from(new Set(observations.map(d => d.year))).sort((a, b) => a - b);
@@ -1404,6 +1731,20 @@ def build_html(payload: dict) -> str:
       entry.areas.forEach(series => series.sort((a, b) => a.year - b.year));
     }});
 
+    const marketByCity = new Map();
+    marketIndicators.forEach(row => {{
+      const key = populationPlaceKey(row);
+      if (!marketByCity.has(key)) {{
+        marketByCity.set(key, {{ key, city: row.city, city_id: row.city_id || "", metrics: new Map() }});
+      }}
+      const entry = marketByCity.get(key);
+      if (!entry.metrics.has(row.metric)) entry.metrics.set(row.metric, []);
+      entry.metrics.get(row.metric).push(row);
+    }});
+    marketByCity.forEach(entry => {{
+      entry.metrics.forEach(series => series.sort((a, b) => a.year - b.year));
+    }});
+
     const state = {{
       startYear: metadata.default_start,
       endYear: metadata.default_end,
@@ -1414,6 +1755,8 @@ def build_html(payload: dict) -> str:
       populationBand: "all",
       minPopulation: "",
       maxPopulation: "",
+      granularityMode: "best",
+      opportunitySignalMetric: "best",
       opportunityMinGrowth: 0,
       opportunityMaxPriceGrowth: 1,
       housingCity: "",
@@ -1425,10 +1768,12 @@ def build_html(payload: dict) -> str:
       populationTab: document.getElementById("populationTab"),
       classificationTab: document.getElementById("classificationTab"),
       opportunityTab: document.getElementById("opportunityTab"),
+      investmentTab: document.getElementById("investmentTab"),
       housingTab: document.getElementById("housingTab"),
       populationPage: document.getElementById("populationPage"),
       classificationPage: document.getElementById("classificationPage"),
       opportunityPage: document.getElementById("opportunityPage"),
+      investmentPage: document.getElementById("investmentPage"),
       housingPage: document.getElementById("housingPage"),
       search: document.getElementById("search"),
       startYear: document.getElementById("startYear"),
@@ -1437,6 +1782,7 @@ def build_html(payload: dict) -> str:
       populationBand: document.getElementById("populationBand"),
       minPopulation: document.getElementById("minPopulation"),
       maxPopulation: document.getElementById("maxPopulation"),
+      granularityMode: document.getElementById("granularityMode"),
       rowLimit: document.getElementById("rowLimit"),
       indexView: document.getElementById("indexView"),
       absoluteView: document.getElementById("absoluteView"),
@@ -1460,12 +1806,21 @@ def build_html(payload: dict) -> str:
       opportunityCount: document.getElementById("opportunityCount"),
       opportunitySummary: document.getElementById("opportunitySummary"),
       opportunityBody: document.getElementById("opportunityBody"),
+      opportunityChartTitle: document.getElementById("opportunityChartTitle"),
       opportunityPeriod: document.getElementById("opportunityPeriod"),
       opportunityChart: document.getElementById("opportunityChart"),
       opportunityLegend: document.getElementById("opportunityLegend"),
       opportunityTooltip: document.getElementById("opportunityTooltip"),
+      opportunitySignalMetric: document.getElementById("opportunitySignalMetric"),
       opportunityMinGrowth: document.getElementById("opportunityMinGrowth"),
       opportunityMaxPriceGrowth: document.getElementById("opportunityMaxPriceGrowth"),
+      investmentActiveFilters: document.getElementById("investmentActiveFilters"),
+      investmentCount: document.getElementById("investmentCount"),
+      investmentSummary: document.getElementById("investmentSummary"),
+      investmentBody: document.getElementById("investmentBody"),
+      investmentPeriod: document.getElementById("investmentPeriod"),
+      investmentYieldDemandChart: document.getElementById("investmentYieldDemandChart"),
+      investmentSupplyChart: document.getElementById("investmentSupplyChart"),
       housingActiveFilters: document.getElementById("housingActiveFilters"),
       housingDataStatus: document.getElementById("housingDataStatus"),
       housingCity: document.getElementById("housingCity"),
@@ -1476,6 +1831,8 @@ def build_html(payload: dict) -> str:
       housingPopulationLabel: document.getElementById("housingPopulationLabel"),
       housingPopulationChart: document.getElementById("housingPopulationChart"),
       housingPriceChart: document.getElementById("housingPriceChart"),
+      housingYieldChart: document.getElementById("housingYieldChart"),
+      housingPriceRentChart: document.getElementById("housingPriceRentChart"),
       housingStatsLegend: document.getElementById("housingStatsLegend"),
       housingSummaryBody: document.getElementById("housingSummaryBody")
     }};
@@ -1489,7 +1846,7 @@ def build_html(payload: dict) -> str:
       elements.endYear.value = state.endYear;
       initHousingControls();
 
-      [elements.populationTab, elements.classificationTab, elements.opportunityTab, elements.housingTab].forEach(button => {{
+      [elements.populationTab, elements.classificationTab, elements.opportunityTab, elements.investmentTab, elements.housingTab].forEach(button => {{
         button.addEventListener("click", () => {{
           state.activeTab = button.dataset.tab;
           render();
@@ -1547,6 +1904,14 @@ def build_html(payload: dict) -> str:
         state.rowLimit = event.target.value;
         render();
       }});
+      elements.granularityMode.addEventListener("change", event => {{
+        state.granularityMode = event.target.value;
+        render();
+      }});
+      elements.opportunitySignalMetric.addEventListener("change", event => {{
+        state.opportunitySignalMetric = event.target.value;
+        render();
+      }});
       elements.opportunityMinGrowth.addEventListener("input", event => {{
         state.opportunityMinGrowth = parseOptionalNumber(event.target.value) ?? 0;
         render();
@@ -1576,9 +1941,11 @@ def build_html(payload: dict) -> str:
         state.rowLimit = "25";
         state.populationBand = "all";
         state.minPopulation = "";
-        state.maxPopulation = "";
-        state.opportunityMinGrowth = 0;
-        state.opportunityMaxPriceGrowth = stablePriceYoYThreshold;
+      state.maxPopulation = "";
+      state.granularityMode = "best";
+      state.opportunitySignalMetric = "best";
+      state.opportunityMinGrowth = 0;
+      state.opportunityMaxPriceGrowth = stablePriceYoYThreshold;
         state.selected.clear();
         elements.search.value = "";
         elements.startYear.value = state.startYear;
@@ -1587,8 +1954,10 @@ def build_html(payload: dict) -> str:
         elements.rowLimit.value = state.rowLimit;
         elements.populationBand.value = state.populationBand;
         elements.minPopulation.value = "";
-        elements.maxPopulation.value = "";
-        elements.opportunityMinGrowth.value = state.opportunityMinGrowth;
+      elements.maxPopulation.value = "";
+      elements.granularityMode.value = state.granularityMode;
+      elements.opportunitySignalMetric.value = state.opportunitySignalMetric;
+      elements.opportunityMinGrowth.value = state.opportunityMinGrowth;
         elements.opportunityMaxPriceGrowth.value = state.opportunityMaxPriceGrowth;
         elements.indexView.classList.add("active");
         elements.absoluteView.classList.remove("active");
@@ -1623,6 +1992,8 @@ def build_html(payload: dict) -> str:
         renderClassification(rankings);
       }} else if (state.activeTab === "opportunity") {{
         renderOpportunitySignals(rankings);
+      }} else if (state.activeTab === "investment") {{
+        renderInvestmentPotential(rankings);
       }} else if (state.activeTab === "housing") {{
         renderHousingPriceTrends();
       }} else {{
@@ -1634,14 +2005,17 @@ def build_html(payload: dict) -> str:
       const isPopulation = state.activeTab === "population";
       const isClassification = state.activeTab === "classification";
       const isOpportunity = state.activeTab === "opportunity";
+      const isInvestment = state.activeTab === "investment";
       const isHousing = state.activeTab === "housing";
       elements.populationTab.classList.toggle("active", isPopulation);
       elements.classificationTab.classList.toggle("active", isClassification);
       elements.opportunityTab.classList.toggle("active", isOpportunity);
+      elements.investmentTab.classList.toggle("active", isInvestment);
       elements.housingTab.classList.toggle("active", isHousing);
       elements.populationPage.hidden = !isPopulation;
       elements.classificationPage.hidden = !isClassification;
       elements.opportunityPage.hidden = !isOpportunity;
+      elements.investmentPage.hidden = !isInvestment;
       elements.housingPage.hidden = !isHousing;
     }}
 
@@ -1705,6 +2079,13 @@ def build_html(payload: dict) -> str:
       return b - a;
     }}
 
+    function nullableAsc(a, b) {{
+      if (a == null && b == null) return 0;
+      if (a == null) return 1;
+      if (b == null) return -1;
+      return a - b;
+    }}
+
     function applyRowLimit(rows) {{
       if (state.rowLimit === "all") return rows;
       return rows.slice(0, Number(state.rowLimit));
@@ -1737,7 +2118,8 @@ def build_html(payload: dict) -> str:
         ["Start year", state.startYear],
         ["End year", state.endYear],
         ["Population filter", populationFilterLabel()],
-        ["Trend view", state.view === "index" ? "Indexed values" : "Raw values"]
+        ["Trend view", state.view === "index" ? "Indexed values" : "Raw values"],
+        ["Granularity", granularityModeLabel()]
       ];
       elements.populationActiveFilters.innerHTML = activeFilterMarkup([
         ...common,
@@ -1750,13 +2132,19 @@ def build_html(payload: dict) -> str:
       ]);
       elements.opportunityActiveFilters.innerHTML = activeFilterMarkup([
         ...common,
-        ["Screen", `Population CAGR >= ${{signedPercent(state.opportunityMinGrowth)}} and price YoY <= ${{signedPercent(state.opportunityMaxPriceGrowth)}}`],
-        ["Price signal", "Stable or decreasing median housing price"]
+        ["Signal metric", opportunitySignalMetricLabel()],
+        ["Screen", `Population CAGR >= ${{signedPercent(state.opportunityMinGrowth)}} and signal YoY <= ${{signedPercent(state.opportunityMaxPriceGrowth)}}`],
+        ["Chart", "All cities with selected signal; matching candidates highlighted"]
+      ]);
+      elements.investmentActiveFilters.innerHTML = activeFilterMarkup([
+        ...common,
+        ["Sort", sortModeLabel()],
+        ["Score", "Demand, supply, yield, affordability, data risk"]
       ]);
       elements.housingActiveFilters.innerHTML = activeFilterMarkup([
         ...common,
         ["Selected city", housingCityLabel() || "None"],
-        ["Housing metrics", "Median, mean, std dev"]
+        ["Housing metrics", "Purchase, rent, yield, price-to-rent"]
       ]);
     }}
 
@@ -1784,9 +2172,41 @@ def build_html(payload: dict) -> str:
         "cagr-asc": "Lowest CAGR",
         "start-pop-desc": "Start population",
         "end-pop-desc": "End population",
-        "median-price-growth-desc": "Median housing price YoY"
+        "median-price-growth-desc": "Median housing price YoY",
+        "investment-score-desc": "Investment score",
+        "demand-score-desc": "Demand score",
+        "supply-score-desc": "Supply constraint score",
+        "yield-score-desc": "Gross rental yield",
+        "price-to-rent-asc": "Price-to-rent ratio",
+        "absorption-desc": "Absorption ratio",
+        "pipeline-asc": "Pipeline rate",
+        "data-quality-desc": "Data quality"
       }};
       return labels[state.sortMode] || state.sortMode;
+    }}
+
+    function opportunitySignalMetricLabel() {{
+      const labels = {{
+        best: "Best available price/rent signal",
+        purchase: "Purchase-price signal only",
+        rent: "Asking-rent signal only"
+      }};
+      return labels[state.opportunitySignalMetric] || labels.best;
+    }}
+
+    function opportunitySignalAxisLabel() {{
+      const labels = {{
+        best: "Price/rent signal",
+        purchase: "Purchase-price signal",
+        rent: "Asking-rent signal"
+      }};
+      return labels[state.opportunitySignalMetric] || labels.best;
+    }}
+
+    function granularityModeLabel() {{
+      return state.granularityMode === "conservative"
+        ? "Conservative comparable mode"
+        : "Best available data";
     }}
 
     function housingEntryPassesPopulationFilter(entry) {{
@@ -1852,13 +2272,13 @@ def build_html(payload: dict) -> str:
       const entry = housingEntryForPopulationKey(populationKey);
       if (!entry) return null;
       const stats = aggregateHousingStatsByYearForEntry(entry);
-      const start = stats.get(state.startYear)?.median ?? null;
-      const end = stats.get(state.endYear)?.median ?? null;
+      const start = stats.get(state.startYear)?.purchaseMedian ?? null;
+      const end = stats.get(state.endYear)?.purchaseMedian ?? null;
       const metrics = growthMetrics(start, end, state.endYear - state.startYear);
       if (!metrics.valid) return null;
       const expectedYears = state.endYear - state.startYear + 1;
-      const availableYears = Array.from(stats.values()).filter(row => row.recordCount > 0).length;
-      const maxRecordCount = Math.max(0, ...Array.from(stats.values()).map(row => row.recordCount));
+      const availableYears = Array.from(stats.values()).filter(row => row.purchaseRecordCount > 0).length;
+      const maxRecordCount = Math.max(0, ...Array.from(stats.values()).map(row => row.purchaseRecordCount));
       return {{
         ...metrics,
         start,
@@ -2056,56 +2476,112 @@ def build_html(payload: dict) -> str:
     }}
 
     function renderOpportunitySignals(rankings) {{
-      const allCandidates = opportunityRows(rankings);
-      const filtered = allCandidates.filter(row => row.city.toLowerCase().includes(state.search));
-      const visible = applyRowLimit(filtered);
+      const allSignalRows = opportunitySignalRows(rankings);
+      const filtered = allSignalRows.filter(row => row.city.toLowerCase().includes(state.search));
+      const matching = filtered.filter(row => row.matchesOpportunity);
+      const visible = applyRowLimit(matching);
+      elements.opportunityChartTitle.textContent = `Population Growth vs ${{opportunitySignalAxisLabel()}} YoY`;
       elements.opportunityPeriod.textContent = `${{state.startYear}}-${{state.endYear}}`;
-      elements.opportunityCount.textContent = `${{filtered.length.toLocaleString()}} candidates`;
-      renderOpportunitySummary(filtered);
-      renderOpportunityTable(visible, filtered.length);
-      renderOpportunityScatter(elements.opportunityChart, filtered.slice(0, 120));
+      renderOpportunitySummary(matching, filtered);
+      renderOpportunityTable(visible, matching.length);
+      renderOpportunityScatter(elements.opportunityChart, filtered);
       renderOpportunityLegend();
+      elements.opportunityCount.textContent = `${{matching.length.toLocaleString()}} matching of ${{filtered.length.toLocaleString()}} charted`;
     }}
 
-    function opportunityRows(rankings) {{
+    function opportunitySignalRows(rankings) {{
       return rankings
         .filter(row => row.cagr >= state.opportunityMinGrowth)
-        .filter(row => row.medianPriceCagr != null && row.medianPriceCagr <= state.opportunityMaxPriceGrowth)
-        .map(row => ({{
-          ...row,
-          opportunitySignal: row.medianPriceCagr < 0 ? "Growth + decreasing prices" : "Growth + stable prices",
-          opportunityClass: row.medianPriceCagr < 0 ? "signal-decreasing" : "signal-stable",
-          opportunitySpread: row.cagr - row.medianPriceCagr,
-          opportunityQuality: combinedQuality(row.quality, row.medianPriceQuality)
-        }}))
+        .map(row => {{
+          const housingSignals = housingSignalsForPopulationKey(row.key);
+          const signal = opportunitySignalForRow(row, housingSignals);
+          if (!signal) return null;
+          const supply = computeSupplyDemandMetrics(row);
+          const matchesOpportunity = signal.cagr <= state.opportunityMaxPriceGrowth;
+          return {{
+            ...row,
+            signalBasis: signal.basis,
+            signalLabel: signal.label,
+            signalStart: signal.start,
+            signalEnd: signal.end,
+            signalGrowth: signal.growth,
+            signalCagr: signal.cagr,
+            signalAnnualChange: signal.annualChange,
+            signalQuality: signal.quality,
+            matchesOpportunity,
+            medianAskingRent: housingSignals.endAskingRent,
+            rentGrowthPct: housingSignals.rentGrowth?.cagr ?? null,
+            grossRentalYieldPct: housingSignals.grossRentalYieldPct,
+            priceToRentRatio: housingSignals.priceToRentRatio,
+            absorptionRatioDisplay: supply.absorptionRatioDisplay,
+            absorptionLabel: supply.absorptionLabel,
+            coverageLevel: summarizeDistinct([housingSignals.coverageLevel, supply.coverageLevel].filter(Boolean)),
+            opportunitySignal: signal.cagr < 0 ? `Growth + decreasing ${{signal.label}}` : matchesOpportunity ? `Growth + stable ${{signal.label}}` : `Growth + rising ${{signal.label}}`,
+            opportunityClass: signal.cagr < 0 ? "signal-decreasing" : matchesOpportunity ? "signal-stable" : "signal-rising",
+            opportunitySpread: row.cagr - signal.cagr,
+            opportunityQuality: combinedQuality(row.quality, signal.quality, housingSignals.grossRentalYieldPct == null ? {{ label: "Medium", className: "quality-medium" }} : null)
+          }};
+        }})
+        .filter(Boolean)
         .sort((a, b) =>
+          Number(b.matchesOpportunity) - Number(a.matchesOpportunity) ||
           b.opportunitySpread - a.opportunitySpread ||
           b.absChange - a.absChange ||
           a.city.localeCompare(b.city)
         );
     }}
 
-    function renderOpportunitySummary(rows) {{
-      const decreasing = rows.filter(row => row.medianPriceCagr < 0).length;
-      const stable = rows.length - decreasing;
-      const best = rows[0];
-      const medianSpreadValues = rows.map(row => row.opportunitySpread).sort((a, b) => a - b);
+    function opportunitySignalForRow(row, housingSignals) {{
+      const purchaseSignal = row.medianPriceCagr == null ? null : {{
+        basis: "Purchase price",
+        label: "purchase price",
+        start: row.medianPriceStart,
+        end: row.medianPriceEnd,
+        growth: row.medianPriceGrowth,
+        cagr: row.medianPriceCagr,
+        annualChange: row.medianPriceAnnualChange,
+        quality: row.medianPriceQuality
+      }};
+      const rentSignal = housingSignals.rentGrowth?.valid ? {{
+        basis: "Asking rent",
+        label: "asking rent",
+        start: housingSignals.startAskingRent,
+        end: housingSignals.endAskingRent,
+        growth: housingSignals.rentGrowth.pctChange,
+        cagr: housingSignals.rentGrowth.cagr,
+        annualChange: housingSignals.rentGrowth.absChange / Math.max(1, state.endYear - state.startYear),
+        quality: housingSignals.rentQuality
+      }} : null;
+
+      if (state.opportunitySignalMetric === "purchase") return purchaseSignal;
+      if (state.opportunitySignalMetric === "rent") return rentSignal;
+      return purchaseSignal || rentSignal;
+    }}
+
+    function renderOpportunitySummary(matchingRows, chartRows) {{
+      const decreasing = matchingRows.filter(row => row.signalCagr < 0).length;
+      const stable = matchingRows.length - decreasing;
+      const charted = chartRows.length;
+      const aboveThreshold = chartRows.filter(row => !row.matchesOpportunity).length;
+      const best = matchingRows[0];
+      const medianSpreadValues = matchingRows.map(row => row.opportunitySpread).sort((a, b) => a - b);
+      const signalLabel = opportunitySignalAxisLabel().toLowerCase();
       elements.opportunitySummary.innerHTML = `
         <div class="opportunity-stat">
-          <div class="opportunity-stat-value">${{rows.length.toLocaleString()}}</div>
+          <div class="opportunity-stat-value">${{matchingRows.length.toLocaleString()}}</div>
           <div class="opportunity-stat-label">Matching cities</div>
         </div>
         <div class="opportunity-stat">
-          <div class="opportunity-stat-value">${{decreasing.toLocaleString()}}</div>
-          <div class="opportunity-stat-label">With decreasing prices</div>
+          <div class="opportunity-stat-value">${{charted.toLocaleString()}}</div>
+          <div class="opportunity-stat-label">Charted cities with ${{escapeHtml(signalLabel)}}</div>
         </div>
         <div class="opportunity-stat">
-          <div class="opportunity-stat-value">${{stable.toLocaleString()}}</div>
-          <div class="opportunity-stat-label">With stable prices</div>
+          <div class="opportunity-stat-value">${{aboveThreshold.toLocaleString()}}</div>
+          <div class="opportunity-stat-label">Above signal threshold</div>
         </div>
         <div class="opportunity-stat">
           <div class="opportunity-stat-value" title="${{best ? escapeAttribute(best.city) : ""}}">${{medianSpreadValues.length ? signedPercent(median(medianSpreadValues)) : "--"}}</div>
-          <div class="opportunity-stat-label">Median growth-price spread</div>
+          <div class="opportunity-stat-label">Median growth-signal spread</div>
         </div>
       `;
     }}
@@ -2113,7 +2589,7 @@ def build_html(payload: dict) -> str:
     function renderOpportunityTable(rows, filteredCount) {{
       elements.opportunityBody.textContent = "";
       if (!rows.length) {{
-        elements.opportunityBody.innerHTML = `<tr><td colspan="10">No cities match positive population growth with stable or decreasing median housing prices for the active filters.</td></tr>`;
+        elements.opportunityBody.innerHTML = `<tr><td colspan="18">No cities match positive population growth with stable or decreasing ${{escapeHtml(opportunitySignalAxisLabel().toLowerCase())}} for the active filters. The chart may still show cities above the signal threshold.</td></tr>`;
         return;
       }}
       const fragment = document.createDocumentFragment();
@@ -2125,9 +2601,17 @@ def build_html(payload: dict) -> str:
           <td>${{number(row.start)}}</td>
           <td>${{signedNumber(row.absChange)}}</td>
           <td>${{signedPercent(row.cagr)}}</td>
-          <td>${{row.medianPriceStart == null ? "--" : money(row.medianPriceStart)}}</td>
-          <td>${{row.medianPriceEnd == null ? "--" : money(row.medianPriceEnd)}}</td>
-          <td title="${{escapeAttribute(priceYoYTitle(row))}}">${{formatPriceYoY(row)}}</td>
+          <td>${{escapeHtml(row.signalBasis)}}</td>
+          <td>${{row.signalStart == null ? "--" : money(row.signalStart)}}</td>
+          <td>${{row.signalEnd == null ? "--" : money(row.signalEnd)}}</td>
+          <td title="${{escapeAttribute(signalYoYTitle(row))}}">${{formatSignalYoY(row)}}</td>
+          <td>${{row.medianAskingRent == null ? "Unavailable" : money(row.medianAskingRent)}}</td>
+          <td>${{row.rentGrowthPct == null ? "Unavailable" : signedPercent(row.rentGrowthPct)}}</td>
+          <td>${{row.grossRentalYieldPct == null ? "Unavailable" : signedPercent(row.grossRentalYieldPct).replace("+", "")}}</td>
+          <td>${{row.priceToRentRatio == null ? "Unavailable" : numberDecimal(row.priceToRentRatio, 1)}}</td>
+          <td title="${{escapeAttribute(row.absorptionLabel)}}">${{row.absorptionRatioDisplay}}</td>
+          <td>${{escapeHtml(row.absorptionLabel)}}</td>
+          <td>${{escapeHtml(row.coverageLevel || "Unavailable")}}</td>
           <td>${{signedPercent(row.opportunitySpread)}}</td>
           <td>${{qualityBadge(row.opportunityQuality)}}</td>
         `;
@@ -2142,7 +2626,7 @@ def build_html(payload: dict) -> str:
         fragment.appendChild(tr);
       }});
       elements.opportunityBody.appendChild(fragment);
-      elements.opportunityCount.textContent = `${{rows.length.toLocaleString()}} of ${{filteredCount.toLocaleString()}} candidates`;
+      elements.opportunityCount.textContent = `${{rows.length.toLocaleString()}} of ${{filteredCount.toLocaleString()}} matching candidates`;
     }}
 
     function renderOpportunityScatter(svg, rows) {{
@@ -2158,7 +2642,7 @@ def build_html(payload: dict) -> str:
       const margin = {{ top: 28, right: 28, bottom: 44, left: 72 }};
       const plotWidth = width - margin.left - margin.right;
       const plotHeight = height - margin.top - margin.bottom;
-      const xValues = rows.map(row => row.medianPriceCagr);
+      const xValues = rows.map(row => row.signalCagr);
       const yValues = rows.map(row => row.cagr);
       const xExtent = extent([...xValues, -1, 0, state.opportunityMaxPriceGrowth]);
       const yExtent = extent([...yValues, 0]);
@@ -2197,21 +2681,21 @@ def build_html(payload: dict) -> str:
       svg.appendChild(line(x(state.opportunityMaxPriceGrowth), margin.top, x(state.opportunityMaxPriceGrowth), height - margin.bottom, "axis"));
       svg.appendChild(line(margin.left, y(state.opportunityMinGrowth), width - margin.right, y(state.opportunityMinGrowth), "axis"));
       svg.appendChild(text(margin.left, margin.top - 8, "Population CAGR", "axis-label"));
-      svg.appendChild(text(width - margin.right, height - 8, "Median housing price YoY", "axis-label", "end"));
-      svg.appendChild(text(x(state.opportunityMaxPriceGrowth) + 4, margin.top + 12, `${{signedPercent(state.opportunityMaxPriceGrowth)}} price threshold`, "axis-label"));
+      svg.appendChild(text(width - margin.right, height - 8, `${{opportunitySignalAxisLabel()}} YoY`, "axis-label", "end"));
+      svg.appendChild(text(x(state.opportunityMaxPriceGrowth) + 4, margin.top + 12, `${{signedPercent(state.opportunityMaxPriceGrowth)}} signal threshold`, "axis-label"));
 
       rows.forEach(row => {{
         const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        circle.setAttribute("cx", x(row.medianPriceCagr));
+        circle.setAttribute("cx", x(row.signalCagr));
         circle.setAttribute("cy", y(row.cagr));
         circle.setAttribute("r", row.start > 1000000 ? "6.5" : row.start > 100000 ? "5.2" : "4.2");
-        circle.setAttribute("fill", row.medianPriceCagr < 0 ? "var(--green)" : "var(--teal)");
-        circle.setAttribute("opacity", "0.82");
+        circle.setAttribute("fill", !row.matchesOpportunity ? "var(--orange)" : row.signalCagr < 0 ? "var(--green)" : "var(--teal)");
+        circle.setAttribute("opacity", row.matchesOpportunity ? "0.84" : "0.36");
         circle.setAttribute("class", "series-point");
         circle.setAttribute("tabindex", "0");
-        circle.setAttribute("aria-label", `${{row.city}}. Population CAGR ${{signedPercent(row.cagr)}}. Median housing price YoY ${{signedPercent(row.medianPriceCagr)}}.`);
+        circle.setAttribute("aria-label", `${{row.city}}. Population CAGR ${{signedPercent(row.cagr)}}. ${{row.signalBasis}} YoY ${{signedPercent(row.signalCagr)}}.`);
         circle.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "title")).textContent =
-          `${{row.city}}\\nPopulation CAGR: ${{signedPercent(row.cagr)}}\\nMedian price YoY: ${{signedPercent(row.medianPriceCagr)}}\\nSpread: ${{signedPercent(row.opportunitySpread)}}`;
+          `${{row.city}}\\nPopulation CAGR: ${{signedPercent(row.cagr)}}\\n${{row.signalBasis}} YoY: ${{signedPercent(row.signalCagr)}}\\nSpread: ${{signedPercent(row.opportunitySpread)}}`;
         circle.addEventListener("mouseenter", event => showOpportunityTooltip(row, event, circle));
         circle.addEventListener("mousemove", event => moveOpportunityTooltip(event, circle));
         circle.addEventListener("mouseleave", hideOpportunityTooltip);
@@ -2225,9 +2709,11 @@ def build_html(payload: dict) -> str:
       elements.opportunityTooltip.innerHTML = `
         <div class="tooltip-title">${{escapeHtml(row.city)}}</div>
         <div class="tooltip-row"><span>Population CAGR</span><b>${{signedPercent(row.cagr)}}</b></div>
-        <div class="tooltip-row"><span>Median price YoY</span><b>${{signedPercent(row.medianPriceCagr)}}</b></div>
-        <div class="tooltip-row"><span>Growth-price spread</span><b>${{signedPercent(row.opportunitySpread)}}</b></div>
+        <div class="tooltip-row"><span>Signal basis</span><b>${{escapeHtml(row.signalBasis)}}</b></div>
+        <div class="tooltip-row"><span>Signal YoY</span><b>${{signedPercent(row.signalCagr)}}</b></div>
+        <div class="tooltip-row"><span>Growth-signal spread</span><b>${{signedPercent(row.opportunitySpread)}}</b></div>
         <div class="tooltip-row"><span>Start population</span><b>${{number(row.start)}}</b></div>
+        <div class="tooltip-row"><span>Status</span><b>${{row.matchesOpportunity ? "Matches screen" : "Above threshold"}}</b></div>
       `;
       elements.opportunityTooltip.hidden = false;
       moveOpportunityTooltip(event, circle);
@@ -2259,9 +2745,534 @@ def build_html(payload: dict) -> str:
 
     function renderOpportunityLegend() {{
       elements.opportunityLegend.innerHTML = `
-        <div class="legend-item"><span class="swatch" style="background:var(--green)"></span><span>Population growth + decreasing median price</span></div>
-        <div class="legend-item"><span class="swatch" style="background:var(--teal)"></span><span>Population growth + stable median price</span></div>
+        <div class="legend-item"><span class="swatch" style="background:var(--green)"></span><span>Population growth + decreasing selected signal</span></div>
+        <div class="legend-item"><span class="swatch" style="background:var(--teal)"></span><span>Population growth + stable selected signal</span></div>
+        <div class="legend-item"><span class="swatch" style="background:var(--orange); opacity:0.36"></span><span>Population growth + signal above threshold</span></div>
       `;
+    }}
+
+    function renderInvestmentPotential(rankings) {{
+      const rows = computeInvestmentRows(rankings)
+        .filter(row => row.city.toLowerCase().includes(state.search));
+      const visible = applyRowLimit(rows);
+      elements.investmentPeriod.textContent = `${{state.startYear}}-${{state.endYear}}`;
+      elements.investmentCount.textContent = `${{rows.length.toLocaleString()}} municipalities`;
+      renderInvestmentSummary(rows);
+      renderInvestmentTable(visible, rows.length);
+      renderInvestmentYieldDemandChart(elements.investmentYieldDemandChart, rows.slice(0, 120));
+      renderInvestmentSupplyChart(elements.investmentSupplyChart, rows.slice(0, 120));
+    }}
+
+    function computeInvestmentRows(rankings) {{
+      const rows = rankings.map(row => computeInvestmentRow(row)).filter(Boolean);
+      rows.sort(compareInvestmentRows);
+      rows.forEach((row, index) => row.rank = index + 1);
+      return rows;
+    }}
+
+    function compareInvestmentRows(a, b) {{
+      if (state.sortMode === "demand-score-desc") return nullableDesc(a.demandScore, b.demandScore) || b.investmentScore - a.investmentScore;
+      if (state.sortMode === "supply-score-desc") return nullableDesc(a.supplyScore, b.supplyScore) || b.investmentScore - a.investmentScore;
+      if (state.sortMode === "yield-score-desc") return nullableDesc(a.grossRentalYieldPct, b.grossRentalYieldPct) || b.investmentScore - a.investmentScore;
+      if (state.sortMode === "price-to-rent-asc") return nullableAsc(a.priceToRentRatio, b.priceToRentRatio) || b.investmentScore - a.investmentScore;
+      if (state.sortMode === "population-cagr-desc" || state.sortMode === "cagr-desc") return b.populationCagrPct - a.populationCagrPct || b.investmentScore - a.investmentScore;
+      if (state.sortMode === "abs-desc") return b.absolutePopulationChange - a.absolutePopulationChange || b.investmentScore - a.investmentScore;
+      if (state.sortMode === "absorption-desc") return nullableDesc(a.absorptionRatioScoreValue, b.absorptionRatioScoreValue) || b.investmentScore - a.investmentScore;
+      if (state.sortMode === "pipeline-asc") return nullableAsc(a.pipelineRateScoreValue, b.pipelineRateScoreValue) || b.investmentScore - a.investmentScore;
+      if (state.sortMode === "data-quality-desc") return b.dataQualityScore - a.dataQualityScore || b.investmentScore - a.investmentScore;
+      return b.investmentScore - a.investmentScore || b.scoreCompleteness - a.scoreCompleteness || a.city.localeCompare(b.city);
+    }}
+
+    function computeInvestmentRow(row) {{
+      const housingSignals = housingSignalsForPopulationKey(row.key);
+      const supply = computeSupplyDemandMetrics(row);
+      const demandScore = scoreDemand(row);
+      const supplyScore = scoreSupplyConstraint(supply);
+      const yieldScore = scoreYield(housingSignals);
+      const affordabilityScore = scoreAffordability(row, housingSignals);
+      const dataQualityScore = scoreDataQuality(row, supply, housingSignals);
+      const score = computeInvestmentScore({{
+        demandScore,
+        supplyScore,
+        yieldScore,
+        affordabilityScore,
+        dataQualityScore
+      }});
+      const coverageLevel = summarizeDistinct([
+        housingSignals.coverageLevel,
+        supply.coverageLevel
+      ].filter(Boolean));
+      const dataQuality = investmentDataQuality(score.scoreCompleteness, dataQualityScore);
+      return {{
+        city: row.city,
+        city_id: row.city_id,
+        key: row.key,
+        rank: null,
+        investmentScore: score.value,
+        demandScore,
+        supplyScore,
+        yieldScore,
+        affordabilityScore,
+        dataQualityScore,
+        scoreCompleteness: score.scoreCompleteness,
+        scoreCompletenessLabel: score.scoreCompletenessLabel,
+        reasonLabel: investmentReasonLabel(row, supply, housingSignals, score),
+        dataQuality,
+        coverageLevel,
+        sourceArea: summarizeDistinct([housingSignals.sourceArea, supply.sourceArea].filter(Boolean)),
+        startPopulation: row.start,
+        endPopulation: row.end,
+        absolutePopulationChange: row.absChange,
+        populationCagrPct: row.cagr,
+        populationGrowthPct: row.total,
+        medianPurchasePrice: housingSignals.endPurchaseMedian,
+        medianAskingRent: housingSignals.endAskingRent,
+        purchasePriceGrowthPct: housingSignals.purchaseGrowth?.pctChange ?? null,
+        rentGrowthPct: housingSignals.rentGrowth?.pctChange ?? null,
+        grossRentalYieldPct: housingSignals.grossRentalYieldPct,
+        priceToRentRatio: housingSignals.priceToRentRatio,
+        absorptionRatio: supply.absorptionRatio,
+        absorptionRatioDisplay: supply.absorptionRatioDisplay,
+        absorptionRatioScoreValue: supply.absorptionRatioScoreValue,
+        absorptionLabel: supply.absorptionLabel,
+        pipelineRate: supply.pipelineRate,
+        pipelineRateDisplay: supply.pipelineRateDisplay,
+        pipelineRateScoreValue: supply.pipelineRateScoreValue,
+        pipelineLabel: supply.pipelineLabel,
+        totalCompletions: supply.totalCompletions,
+        totalPermits: supply.totalPermits,
+        supplyDataStatus: supply.status,
+        yieldAvailable: housingSignals.grossRentalYieldPct != null,
+        purchaseAvailable: housingSignals.endPurchaseMedian != null,
+        rentAvailable: housingSignals.endAskingRent != null
+      }};
+    }}
+
+    function housingSignalsForPopulationKey(populationKey) {{
+      const housingEntry = housingEntryForPopulationKey(populationKey);
+      const purchaseStats = aggregateHousingStatsByYearForEntry(housingEntry);
+      const marketRent = metricByYear(populationKey, "asking_rent_eur_per_m2");
+      const yearsElapsed = state.endYear - state.startYear;
+      const startPurchaseMedian = purchaseStats.get(state.startYear)?.purchaseMedian ?? null;
+      const endPurchaseMedian = purchaseStats.get(state.endYear)?.purchaseMedian ?? null;
+      const startRent = marketRent.get(state.startYear)?.value ?? purchaseStats.get(state.startYear)?.rentMedian ?? null;
+      const endRent = marketRent.get(state.endYear)?.value ?? purchaseStats.get(state.endYear)?.rentMedian ?? null;
+      const yieldMetrics = computeYieldMetrics(endPurchaseMedian, endRent);
+      const purchaseCoverage = purchaseStats.get(state.endYear)?.coverageSummary || null;
+      const rentCoverage = marketRent.get(state.endYear)?.coverage_level || purchaseStats.get(state.endYear)?.coverageSummary || null;
+      const rentSourceArea = marketRent.get(state.endYear)?.source_area || purchaseStats.get(state.endYear)?.sourceAreaSummary || null;
+      const expectedYears = state.endYear - state.startYear + 1;
+      const rentAvailableYears = Array.from({{ length: expectedYears }}, (_, index) => state.startYear + index)
+        .filter(year => marketRent.has(year) || purchaseStats.get(year)?.rentRecordCount > 0)
+        .length;
+      return {{
+        startPurchaseMedian,
+        endPurchaseMedian,
+        startAskingRent: startRent,
+        endAskingRent: endRent,
+        grossRentalYieldPct: yieldMetrics?.grossRentalYieldPct ?? null,
+        priceToRentRatio: yieldMetrics?.priceToRentRatio ?? null,
+        purchaseGrowth: growthMetrics(startPurchaseMedian, endPurchaseMedian, yearsElapsed),
+        rentGrowth: growthMetrics(startRent, endRent, yearsElapsed),
+        rentQuality: dataQuality(rentAvailableYears, expectedYears),
+        coverageLevel: summarizeDistinct([purchaseCoverage, rentCoverage].filter(Boolean)) || "Unavailable",
+        sourceArea: summarizeDistinct([purchaseStats.get(state.endYear)?.sourceAreaSummary, rentSourceArea].filter(Boolean)),
+        hasPurchase: endPurchaseMedian != null,
+        hasRent: endRent != null
+      }};
+    }}
+
+    function computeYieldMetrics(purchasePricePerM2, monthlyRentPerM2) {{
+      if (purchasePricePerM2 == null || monthlyRentPerM2 == null || purchasePricePerM2 <= 0 || monthlyRentPerM2 <= 0) return null;
+      const annualRentPerM2 = monthlyRentPerM2 * 12;
+      return {{
+        annualRentPerM2,
+        grossRentalYieldPct: (annualRentPerM2 / purchasePricePerM2) * 100,
+        priceToRentRatio: purchasePricePerM2 / annualRentPerM2
+      }};
+    }}
+
+    function computeSupplyDemandMetrics(row) {{
+      const permitSeries = metricByYear(row.key, "building_permits_per_1000_residents");
+      const completionSeries = metricByYear(row.key, "completed_new_apartments_per_1000_residents");
+      const populationByYear = new Map(row.series.map(point => [point.year, point.value]));
+      let totalCompletions = 0;
+      let totalPermits = 0;
+      let completionYears = 0;
+      let permitYears = 0;
+      let completionRateSum = 0;
+      let permitRateSum = 0;
+      const coverageLevels = new Set();
+      const sourceAreas = new Set();
+      for (let year = state.startYear; year <= state.endYear; year += 1) {{
+        const population = populationByYear.get(year);
+        const completion = completionSeries.get(year);
+        const permit = permitSeries.get(year);
+        if (population != null && completion?.value != null) {{
+          totalCompletions += population * completion.value / 1000;
+          completionYears += 1;
+          completionRateSum += completion.value;
+          coverageLevels.add(completion.coverage_level || "municipality");
+          sourceAreas.add(completion.source_area || row.city);
+        }}
+        if (population != null && permit?.value != null) {{
+          totalPermits += population * permit.value / 1000;
+          permitYears += 1;
+          permitRateSum += permit.value;
+          coverageLevels.add(permit.coverage_level || "municipality");
+          sourceAreas.add(permit.source_area || row.city);
+        }}
+      }}
+      const populationChange = row.absChange;
+      const hasSupplyData = completionYears > 0 || permitYears > 0;
+      let absorptionRatio = null;
+      let absorptionRatioDisplay = "Insufficient supply data";
+      let absorptionRatioScoreValue = null;
+      if (completionYears > 0 && totalCompletions > 0) {{
+        absorptionRatio = populationChange / totalCompletions;
+        absorptionRatioScoreValue = absorptionRatio;
+        absorptionRatioDisplay = numberDecimal(absorptionRatio, 2);
+      }} else if (populationChange > 0 && totalCompletions === 0 && hasSupplyData) {{
+        absorptionRatioScoreValue = 10;
+        absorptionRatioDisplay = "No completions";
+      }}
+
+      let pipelineRate = null;
+      let pipelineRateDisplay = "Unavailable";
+      let pipelineRateScoreValue = null;
+      if (totalCompletions > 0) {{
+        pipelineRate = totalPermits / totalCompletions;
+        pipelineRateScoreValue = pipelineRate;
+        pipelineRateDisplay = numberDecimal(pipelineRate, 2);
+      }} else if (totalPermits > 0) {{
+        pipelineRateScoreValue = 10;
+        pipelineRateDisplay = "Unbounded";
+      }}
+
+      return {{
+        totalCompletions,
+        totalPermits,
+        completionYears,
+        permitYears,
+        completionRateAvg: completionYears ? completionRateSum / completionYears : null,
+        permitRateAvg: permitYears ? permitRateSum / permitYears : null,
+        absorptionRatio,
+        absorptionRatioDisplay,
+        absorptionRatioScoreValue,
+        absorptionLabel: absorptionPressureLabel(absorptionRatio, absorptionRatioDisplay, populationChange),
+        pipelineRate,
+        pipelineRateDisplay,
+        pipelineRateScoreValue,
+        pipelineLabel: pipelineLabel(pipelineRate, pipelineRateDisplay),
+        coverageLevel: summarizeDistinct(Array.from(coverageLevels)) || "Unavailable",
+        sourceArea: summarizeDistinct(Array.from(sourceAreas)) || "",
+        status: hasSupplyData ? "Available" : "Insufficient supply data"
+      }};
+    }}
+
+    function metricByYear(populationKey, metric) {{
+      const entry = marketByCity.get(populationKey);
+      const result = new Map();
+      if (!entry || !entry.metrics.has(metric)) return result;
+      entry.metrics.get(metric).forEach(row => {{
+        if (row.year >= state.startYear && row.year <= state.endYear) result.set(row.year, row);
+      }});
+      return result;
+    }}
+
+    function scoreDemand(row) {{
+      const cagrScore = clamp(((row.cagr + 1) / 3) * 55, 0, 55);
+      const absRate = row.absChange / Math.max(1, row.start);
+      const absScore = clamp(absRate * 180, 0, 25);
+      const baseScore = clamp((Math.log10(Math.max(1000, row.start)) - 3) / 3 * 20, 0, 20);
+      const smallPenalty = row.start < 10000 && state.populationBand !== "small" && state.populationBand !== "custom" ? 12 : 0;
+      return clamp(cagrScore + absScore + baseScore - smallPenalty, 0, 100);
+    }}
+
+    function scoreSupplyConstraint(supply) {{
+      if (supply.absorptionRatioScoreValue == null) return null;
+      let score = piecewise(supply.absorptionRatioScoreValue, [
+        [0, 0],
+        [0.7, 25],
+        [1.2, 45],
+        [2.0, 75],
+        [3.0, 100]
+      ]);
+      if (supply.pipelineRateScoreValue != null) {{
+        if (supply.pipelineRateScoreValue > 1.25) {{
+          score -= clamp((supply.pipelineRateScoreValue - 1.25) / 1.25 * 10, 0, 10);
+        }} else if (supply.pipelineRateScoreValue < 0.75) {{
+          score += clamp((0.75 - supply.pipelineRateScoreValue) / 0.75 * 10, 0, 10);
+        }}
+      }}
+      return clamp(score, 0, 100);
+    }}
+
+    function scoreYield(housingSignals) {{
+      const yieldPct = housingSignals.grossRentalYieldPct;
+      if (yieldPct == null) return null;
+      const yieldScore = piecewise(yieldPct, [
+        [0, 0],
+        [2.0, 25],
+        [3.5, 55],
+        [5.0, 85],
+        [7.0, 95]
+      ]);
+      const ratio = housingSignals.priceToRentRatio;
+      const ratioModifier = ratio == null ? 0 : ratio <= 18 ? 10 : ratio <= 28 ? 0 : -12;
+      return clamp(yieldScore + ratioModifier, 0, 100);
+    }}
+
+    function scoreAffordability(row, housingSignals) {{
+      if (!housingSignals.purchaseGrowth?.valid && !housingSignals.rentGrowth?.valid) return null;
+      let score = 50;
+      const purchaseGrowth = housingSignals.purchaseGrowth?.cagr ?? null;
+      const rentGrowth = housingSignals.rentGrowth?.cagr ?? null;
+      if (purchaseGrowth != null) score += clamp((4 - purchaseGrowth) * 7, -30, 25);
+      if (rentGrowth != null) score += clamp(rentGrowth * 8, -25, 25);
+      if (purchaseGrowth != null && rentGrowth != null) {{
+        score += clamp((rentGrowth - purchaseGrowth) * 8, -25, 25);
+      }}
+      if (row.cagr > 0 && purchaseGrowth != null && purchaseGrowth <= row.cagr + 2) score += 8;
+      if (rentGrowth != null && rentGrowth < -1) score -= 20;
+      return clamp(score, 0, 100);
+    }}
+
+    function scoreDataQuality(row, supply, housingSignals) {{
+      let score = 100;
+      if (row.quality.label === "Medium") score -= 10;
+      if (row.quality.label === "Low") score -= 25;
+      if (supply.status !== "Available") score -= 20;
+      if (!housingSignals.hasPurchase) score -= 18;
+      if (!housingSignals.hasRent) score -= 18;
+      if (housingSignals.grossRentalYieldPct == null) score -= 14;
+      const coverageText = `${{housingSignals.coverageLevel}} ${{supply.coverageLevel}}`.toLowerCase();
+      if (coverageText.includes("district")) score -= state.granularityMode === "conservative" ? 18 : 8;
+      if (coverageText.includes("area")) score -= state.granularityMode === "conservative" ? 14 : 4;
+      return clamp(score, 0, 100);
+    }}
+
+    function computeInvestmentScore(scores) {{
+      const weighted = [
+        ["demandScore", investmentWeights.demand],
+        ["supplyScore", investmentWeights.supply],
+        ["yieldScore", investmentWeights.yield],
+        ["affordabilityScore", investmentWeights.affordability],
+        ["dataQualityScore", investmentWeights.dataQuality]
+      ];
+      let availableWeight = 0;
+      let total = 0;
+      const available = [];
+      const missing = [];
+      weighted.forEach(([key, weight]) => {{
+        if (scores[key] == null || !Number.isFinite(scores[key])) {{
+          missing.push(key.replace("Score", ""));
+          return;
+        }}
+        availableWeight += weight;
+        total += scores[key] * weight;
+        available.push(key.replace("Score", ""));
+      }});
+      const value = availableWeight > 0 ? total / availableWeight : 0;
+      return {{
+        value: clamp(value, 0, 100),
+        scoreCompleteness: availableWeight,
+        scoreCompletenessLabel: `${{Math.round(availableWeight * 100)}}% (${{available.join(", ") || "none"}}${{missing.length ? "; missing " + missing.join(", ") : ""}})`
+      }};
+    }}
+
+    function investmentReasonLabel(row, supply, housingSignals, score) {{
+      if (score.scoreCompleteness < 0.45) return "Insufficient investment data";
+      if (row.cagr > 0.5 && supply.absorptionRatioDisplay === "No completions") return "No completions + positive demand";
+      if (row.cagr > 0.5 && supply.absorptionRatioScoreValue >= 2) return "High demand + constrained supply";
+      if (housingSignals.grossRentalYieldPct != null && housingSignals.grossRentalYieldPct >= 3.5 && row.cagr > 0) return "Good yield + positive demand";
+      if (row.cagr > 0 && housingSignals.grossRentalYieldPct == null) return "Strong growth but missing yield";
+      if (row.cagr > 0 && housingSignals.grossRentalYieldPct != null && housingSignals.grossRentalYieldPct < 2) return "Growing but low yield";
+      if (row.cagr <= 0 && housingSignals.endPurchaseMedian != null) return "Cheap but weak demand";
+      if (supply.absorptionRatioScoreValue != null && supply.absorptionRatioScoreValue < 0.7) return "Possible oversupply risk";
+      if (`${{housingSignals.coverageLevel}} ${{supply.coverageLevel}}`.toLowerCase().includes("district")) return "High growth but district-level fallback";
+      return "Balanced but check fundamentals";
+    }}
+
+    function investmentDataQuality(completeness, dataQualityScore) {{
+      if (completeness < 0.45 || dataQualityScore < 45) return {{ label: "Low", className: "quality-low" }};
+      if (completeness < 0.8 || dataQualityScore < 75) return {{ label: "Medium", className: "quality-medium" }};
+      return {{ label: "High", className: "quality-high" }};
+    }}
+
+    function absorptionPressureLabel(value, display, populationChange) {{
+      if (display === "No completions") return "No completions + positive demand";
+      if (value == null) return populationChange < 0 ? "Shrinking population" : "Insufficient supply data";
+      if (value > 2.0) return "Severe shortage / high rent pressure";
+      if (value >= 1.2) return "Tight / undersupplied";
+      if (value >= 0.7) return "Broadly balanced";
+      if (value >= 0) return "Potential oversupply";
+      return "Shrinking population";
+    }}
+
+    function pipelineLabel(value, display) {{
+      if (display === "Unbounded") return "Unbounded supply pipeline";
+      if (value == null) return "Unavailable";
+      if (value > 1.25) return "Expanding supply pipeline";
+      if (value >= 0.75) return "Stable pipeline";
+      return "Weak / shrinking pipeline";
+    }}
+
+    function piecewise(value, points) {{
+      if (value <= points[0][0]) return points[0][1];
+      for (let index = 1; index < points.length; index += 1) {{
+        const [x1, y1] = points[index - 1];
+        const [x2, y2] = points[index];
+        if (value <= x2) {{
+          const ratio = (value - x1) / (x2 - x1 || 1);
+          return y1 + ratio * (y2 - y1);
+        }}
+      }}
+      return points[points.length - 1][1];
+    }}
+
+    function renderInvestmentSummary(rows) {{
+      const top = rows[0];
+      const scoreValues = rows.map(row => row.investmentScore).sort((a, b) => a - b);
+      const computableYield = rows.filter(row => row.grossRentalYieldPct != null).length;
+      const highQuality = rows.filter(row => row.dataQuality.label === "High").length;
+      elements.investmentSummary.innerHTML = `
+        <div class="investment-stat">
+          <div class="investment-stat-value" title="${{top ? escapeAttribute(top.city) : ""}}">${{top ? escapeHtml(top.city) : "--"}}</div>
+          <div class="investment-stat-label">Top ranked municipality</div>
+        </div>
+        <div class="investment-stat">
+          <div class="investment-stat-value">${{scoreValues.length ? numberDecimal(median(scoreValues), 1) : "--"}}</div>
+          <div class="investment-stat-label">Median investment score</div>
+        </div>
+        <div class="investment-stat">
+          <div class="investment-stat-value">${{rows.length.toLocaleString()}}</div>
+          <div class="investment-stat-label">Investable candidates</div>
+        </div>
+        <div class="investment-stat">
+          <div class="investment-stat-value">${{computableYield.toLocaleString()}}</div>
+          <div class="investment-stat-label">With computable yield</div>
+        </div>
+        <div class="investment-stat">
+          <div class="investment-stat-value">${{highQuality.toLocaleString()}}</div>
+          <div class="investment-stat-label">High data quality</div>
+        </div>
+      `;
+    }}
+
+    function renderInvestmentTable(rows, filteredCount) {{
+      elements.investmentBody.textContent = "";
+      if (!rows.length) {{
+        elements.investmentBody.innerHTML = `<tr><td colspan="21">No municipalities match the active filters.</td></tr>`;
+        return;
+      }}
+      const fragment = document.createDocumentFragment();
+      rows.forEach(row => {{
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${{row.rank}}</td>
+          <td title="${{escapeAttribute(row.city)}}">${{escapeHtml(row.city)}}</td>
+          <td>${{scoreText(row.investmentScore)}}</td>
+          <td>${{scoreText(row.demandScore)}}</td>
+          <td>${{scoreText(row.supplyScore, "Insufficient supply data")}}</td>
+          <td>${{scoreText(row.yieldScore, "Unavailable")}}</td>
+          <td>${{scoreText(row.affordabilityScore, "Unavailable")}}</td>
+          <td>${{scoreText(row.dataQualityScore)}}</td>
+          <td title="${{escapeAttribute(row.scoreCompletenessLabel)}}">${{signedPercent(row.scoreCompleteness * 100).replace("+", "")}}</td>
+          <td>${{number(row.startPopulation)}}</td>
+          <td>${{signedPercent(row.populationCagrPct)}}</td>
+          <td>${{signedNumber(row.absolutePopulationChange)}}</td>
+          <td>${{row.grossRentalYieldPct == null ? "Unavailable" : signedPercent(row.grossRentalYieldPct).replace("+", "")}}</td>
+          <td>${{row.priceToRentRatio == null ? "Unavailable" : numberDecimal(row.priceToRentRatio, 1)}}</td>
+          <td>${{row.medianPurchasePrice == null ? "Unavailable" : money(row.medianPurchasePrice)}}</td>
+          <td>${{row.medianAskingRent == null ? "Unavailable" : money(row.medianAskingRent)}}</td>
+          <td title="${{escapeAttribute(row.absorptionLabel)}}">${{row.absorptionRatioDisplay}}</td>
+          <td title="${{escapeAttribute(row.pipelineLabel)}}">${{row.pipelineRateDisplay}}</td>
+          <td title="${{escapeAttribute(row.sourceArea)}}">${{escapeHtml(row.coverageLevel || "Unavailable")}}</td>
+          <td>${{qualityBadge(row.dataQuality)}}</td>
+          <td title="${{escapeAttribute(row.reasonLabel)}}">${{escapeHtml(row.reasonLabel)}}</td>
+        `;
+        fragment.appendChild(tr);
+      }});
+      elements.investmentBody.appendChild(fragment);
+      elements.investmentCount.textContent = `${{rows.length.toLocaleString()}} of ${{filteredCount.toLocaleString()}} municipalities`;
+    }}
+
+    function renderInvestmentYieldDemandChart(svg, rows) {{
+      const points = rows.filter(row => row.grossRentalYieldPct != null);
+      renderInvestmentScatter(svg, points, {{
+        xValue: row => row.grossRentalYieldPct,
+        yValue: row => row.populationCagrPct,
+        xLabel: "Gross rental yield %",
+        yLabel: "Population CAGR %",
+        empty: "No rows with computable gross rental yield",
+        tooltip: row => `${{row.city}}\\nInvestment score: ${{scoreText(row.investmentScore)}}\\nGross yield: ${{signedPercent(row.grossRentalYieldPct)}}\\nPopulation CAGR: ${{signedPercent(row.populationCagrPct)}}\\nAbsorption: ${{row.absorptionRatioDisplay}}\\nData quality: ${{row.dataQuality.label}}`
+      }});
+    }}
+
+    function renderInvestmentSupplyChart(svg, rows) {{
+      const points = rows.filter(row => row.absorptionRatioScoreValue != null);
+      renderInvestmentScatter(svg, points, {{
+        xValue: row => row.populationCagrPct,
+        yValue: row => Math.min(10, row.absorptionRatioScoreValue),
+        xLabel: "Population CAGR %",
+        yLabel: "Absorption ratio",
+        empty: "No rows with supply-demand data",
+        tooltip: row => `${{row.city}}\\nPopulation change: ${{signedNumber(row.absolutePopulationChange)}}\\nTotal completions: ${{number(row.totalCompletions)}}\\nAbsorption: ${{row.absorptionRatioDisplay}}\\nPipeline: ${{row.pipelineRateDisplay}}`
+      }});
+    }}
+
+    function renderInvestmentScatter(svg, rows, config) {{
+      if (!rows.length) {{
+        drawEmptySvg(svg, config.empty);
+        return;
+      }}
+      const frame = svg.parentElement;
+      const frameRect = frame.getBoundingClientRect();
+      const width = Math.max(460, Math.floor(frameRect.width || svg.clientWidth || 760));
+      const height = Math.max(260, Math.floor(frameRect.height || svg.clientHeight || 340));
+      const margin = {{ top: 26, right: 28, bottom: 42, left: 70 }};
+      const plotWidth = width - margin.left - margin.right;
+      const plotHeight = height - margin.top - margin.bottom;
+      const xValues = rows.map(config.xValue);
+      const yValues = rows.map(config.yValue);
+      const xExtent = extent([...xValues, 0]);
+      const yExtent = extent([...yValues, 0]);
+      const xPad = (xExtent[1] - xExtent[0]) * 0.12 || 1;
+      const yPad = (yExtent[1] - yExtent[0]) * 0.12 || 1;
+      const xMin = Math.min(0, xExtent[0] - xPad);
+      const xMax = xExtent[1] + xPad;
+      const yMin = Math.min(0, yExtent[0] - yPad);
+      const yMax = yExtent[1] + yPad;
+      const x = value => margin.left + ((value - xMin) / (xMax - xMin || 1)) * plotWidth;
+      const y = value => margin.top + (1 - ((value - yMin) / (yMax - yMin || 1))) * plotHeight;
+      svg.setAttribute("width", width);
+      svg.setAttribute("height", height);
+      svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
+      svg.textContent = "";
+      ticks(xMin, xMax, 5).forEach(tick => {{
+        svg.appendChild(line(x(tick), margin.top, x(tick), height - margin.bottom, "grid-line"));
+        svg.appendChild(text(x(tick), height - margin.bottom + 24, numberDecimal(tick, 1), "axis-label", "middle"));
+      }});
+      ticks(yMin, yMax, 5).forEach(tick => {{
+        svg.appendChild(line(margin.left, y(tick), width - margin.right, y(tick), "grid-line"));
+        svg.appendChild(text(margin.left - 10, y(tick) + 4, numberDecimal(tick, 1), "axis-label", "end"));
+      }});
+      svg.appendChild(line(margin.left, height - margin.bottom, width - margin.right, height - margin.bottom, "axis"));
+      svg.appendChild(line(margin.left, margin.top, margin.left, height - margin.bottom, "axis"));
+      svg.appendChild(text(margin.left, margin.top - 8, config.yLabel, "axis-label"));
+      svg.appendChild(text(width - margin.right, height - 8, config.xLabel, "axis-label", "end"));
+      rows.forEach(row => {{
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", x(config.xValue(row)));
+        circle.setAttribute("cy", y(config.yValue(row)));
+        circle.setAttribute("r", row.investmentScore >= 75 ? "6" : "4.5");
+        circle.setAttribute("fill", row.dataQuality.label === "High" ? "var(--green)" : row.dataQuality.label === "Medium" ? "var(--orange)" : "var(--red)");
+        circle.setAttribute("opacity", "0.78");
+        circle.setAttribute("class", "series-point");
+        circle.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "title")).textContent = config.tooltip(row);
+        svg.appendChild(circle);
+      }});
     }}
 
     function renderClassification(rankings) {{
@@ -2455,14 +3466,18 @@ def build_html(payload: dict) -> str:
       elements.housingPopulationLabel.textContent = "";
       elements.housingPopulationChart.textContent = "";
       elements.housingPriceChart.textContent = "";
+      elements.housingYieldChart.textContent = "";
+      elements.housingPriceRentChart.textContent = "";
 
       if (!housingPrices.length) {{
         elements.housingDataStatus.textContent = "No data loaded";
         elements.housingNote.textContent = `Add ${{metadata.housing_price_input}} with city, area, year, median_housing_price, mean_housing_price, and stddev_housing_price columns to enable this page.`;
         elements.housingCitySummary.innerHTML = `<div class="housing-empty">No neighborhood-level housing price data is currently loaded.</div>`;
-        elements.housingSummaryBody.innerHTML = `<tr><td colspan="9">No housing price data loaded.</td></tr>`;
+        elements.housingSummaryBody.innerHTML = `<tr><td colspan="10">No housing price data loaded.</td></tr>`;
         drawEmptySvg(elements.housingPopulationChart, "No housing price data loaded");
         drawEmptySvg(elements.housingPriceChart, "No housing price data loaded");
+        drawEmptySvg(elements.housingYieldChart, "No yield data loaded");
+        drawEmptySvg(elements.housingPriceRentChart, "No price-to-rent data loaded");
         return;
       }}
 
@@ -2474,16 +3489,19 @@ def build_html(payload: dict) -> str:
 
       if (!cityData || !cityData.populationSeries.length) {{
         elements.housingCitySummary.innerHTML = `<div class="housing-empty">Select a city with population and housing price data.</div>`;
-        elements.housingSummaryBody.innerHTML = `<tr><td colspan="9">No matching population data for this selected city.</td></tr>`;
+        elements.housingSummaryBody.innerHTML = `<tr><td colspan="10">No matching population data for this selected city.</td></tr>`;
         drawEmptySvg(elements.housingPopulationChart, "No matching population data");
         drawEmptySvg(elements.housingPriceChart, "No matching housing data");
+        drawEmptySvg(elements.housingYieldChart, "No matching yield data");
+        drawEmptySvg(elements.housingPriceRentChart, "No matching price-to-rent data");
         return;
       }}
 
-      elements.housingNote.textContent = `Selected city: ${{cityData.city}}. The city selector controls the population chart, housing-stat chart, and yearly table. Price basis: ${{cityData.priceBasisSummary}}. Coverage: ${{cityData.coverageSummary}}. Source: ${{cityData.sourceSummary}}.`;
+      elements.housingNote.textContent = `Selected city: ${{cityData.city}}. The city selector controls every chart and row. ${{cityData.availabilityNote}} Coverage: ${{cityData.coverageSummary}}. Source: ${{cityData.sourceSummary}}.`;
       renderHousingCitySummary(cityData);
       renderHousingPopulationChart(elements.housingPopulationChart, cityData);
       renderHousingStatsChart(elements.housingPriceChart, cityData.yearlyRows);
+      renderHousingYieldTrendCharts(cityData.yearlyRows);
       renderHousingYearlyTable(cityData.yearlyRows);
     }}
 
@@ -2495,36 +3513,51 @@ def build_html(payload: dict) -> str:
       const populationSeries = (populationEntry?.series || [])
         .filter(d => d.year >= state.startYear && d.year <= state.endYear);
       const housingStatsByYear = aggregateHousingStatsByYear(state.housingCity);
+      const marketRentByYear = metricByYear(populationKey, "asking_rent_eur_per_m2");
       const housingRows = Array.from(housingEntry.areas.values()).flat();
       const yearlyRows = [];
       let previousPopulation = null;
-      let previousMedian = null;
+      let previousPurchase = null;
+      let previousRent = null;
       for (let year = state.startYear; year <= state.endYear; year += 1) {{
         const population = populationSeries.find(d => d.year === year)?.value ?? null;
         const stats = housingStatsByYear.get(year) || null;
-        const medianPrice = stats?.median ?? null;
+        const purchaseMedian = stats?.purchaseMedian ?? null;
+        const rentMedian = marketRentByYear.get(year)?.value ?? stats?.rentMedian ?? null;
+        const yieldMetrics = computeYieldMetrics(purchaseMedian, rentMedian);
         const populationYoyChange = previousPopulation != null && population != null ? population - previousPopulation : null;
-        const medianPriceYoyChange = previousMedian != null && medianPrice != null ? medianPrice - previousMedian : null;
+        const purchaseYoyChange = previousPurchase != null && purchaseMedian != null ? purchaseMedian - previousPurchase : null;
+        const rentYoyChange = previousRent != null && rentMedian != null ? rentMedian - previousRent : null;
         yearlyRows.push({{
           year,
           population,
-          medianPrice,
-          meanPrice: stats?.mean ?? null,
-          stddevPrice: stats?.stddev ?? null,
-          recordCount: stats?.recordCount ?? 0,
+          purchaseMedian,
+          purchaseMean: stats?.purchaseMean ?? null,
+          purchaseStddev: stats?.purchaseStddev ?? null,
+          rentMedian,
+          rentMean: stats?.rentMean ?? rentMedian,
+          rentStddev: stats?.rentStddev ?? null,
+          grossRentalYieldPct: yieldMetrics?.grossRentalYieldPct ?? null,
+          priceToRentRatio: yieldMetrics?.priceToRentRatio ?? null,
+          recordCount: Math.max(stats?.purchaseRecordCount ?? 0, stats?.rentRecordCount ?? 0, marketRentByYear.has(year) ? 1 : 0),
           populationYoyChange,
           populationYoy: yoy(population, previousPopulation),
-          medianPriceYoyChange,
-          medianPriceYoy: yoy(medianPrice, previousMedian)
+          purchaseYoyChange,
+          purchaseYoy: yoy(purchaseMedian, previousPurchase),
+          rentYoyChange,
+          rentYoy: yoy(rentMedian, previousRent)
         }});
         previousPopulation = population ?? null;
-        previousMedian = medianPrice ?? null;
+        previousPurchase = purchaseMedian ?? null;
+        previousRent = rentMedian ?? null;
       }}
       const expectedYears = state.endYear - state.startYear + 1;
       const completeHousingYears = yearlyRows.filter(row => row.recordCount > 0).length;
       const maxRecordCount = Math.max(0, ...yearlyRows.map(row => row.recordCount));
       const startRow = yearlyRows.find(row => row.year === state.startYear) || null;
       const endRow = yearlyRows.find(row => row.year === state.endYear) || null;
+      const hasPurchase = yearlyRows.some(row => row.purchaseMedian != null);
+      const hasRent = yearlyRows.some(row => row.rentMedian != null);
       return {{
         city: housingEntry.city,
         city_id: housingEntry.city_id,
@@ -2533,10 +3566,14 @@ def build_html(payload: dict) -> str:
         yearlyRows,
         quality: dataQuality(Math.min(populationSeries.length, completeHousingYears), expectedYears, maxRecordCount),
         populationGrowth: growthMetrics(startRow?.population ?? null, endRow?.population ?? null, state.endYear - state.startYear),
-        medianPriceGrowth: growthMetrics(startRow?.medianPrice ?? null, endRow?.medianPrice ?? null, state.endYear - state.startYear),
+        medianPriceGrowth: growthMetrics(startRow?.purchaseMedian ?? null, endRow?.purchaseMedian ?? null, state.endYear - state.startYear),
+        rentGrowth: growthMetrics(startRow?.rentMedian ?? null, endRow?.rentMedian ?? null, state.endYear - state.startYear),
         areaCount: housingEntry.areas.size,
         housingRecordCount: housingRows.length,
-        priceBasisSummary: summarizeDistinct(housingRows.map(row => row.price_basis || "Housing price")),
+        hasPurchase,
+        hasRent,
+        availabilityNote: housingAvailabilityNote(hasPurchase, hasRent),
+        priceBasisSummary: summarizeDistinct(housingRows.map(row => row.price_basis || "Housing signal")),
         coverageSummary: summarizeDistinct(housingRows.map(row => row.coverage_level || "area")),
         sourceSummary: summarizeDistinct(housingRows.map(row => row.source || "loaded housing data"))
       }};
@@ -2554,30 +3591,85 @@ def build_html(payload: dict) -> str:
       cityAreas.forEach(series => {{
         series.forEach(row => {{
           if (row.year < state.startYear || row.year > state.endYear) return;
-          if (!byYear.has(row.year)) byYear.set(row.year, {{ medianValues: [], meanValues: [] }});
+          if (!byYear.has(row.year)) {{
+            byYear.set(row.year, {{
+              purchaseMedianValues: [],
+              purchaseMeanValues: [],
+              rentMedianValues: [],
+              rentMeanValues: [],
+              coverageLevels: new Set(),
+              sourceAreas: new Set(),
+              sources: new Set()
+            }});
+          }}
           const bucket = byYear.get(row.year);
-          if (row.median_housing_price != null) bucket.medianValues.push(row.median_housing_price);
-          if (row.mean_housing_price != null) bucket.meanValues.push(row.mean_housing_price);
+          bucket.coverageLevels.add(row.coverage_level || "unknown");
+          bucket.sourceAreas.add(row.source_area || row.area || "unknown");
+          bucket.sources.add(row.source || "loaded housing data");
+          if (isRentBasis(row.price_basis)) {{
+            if (row.median_housing_price != null) bucket.rentMedianValues.push(row.median_housing_price);
+            if (row.mean_housing_price != null) bucket.rentMeanValues.push(row.mean_housing_price);
+          }} else if (isPurchaseBasis(row.price_basis)) {{
+            if (row.median_housing_price != null) bucket.purchaseMedianValues.push(row.median_housing_price);
+            if (row.mean_housing_price != null) bucket.purchaseMeanValues.push(row.mean_housing_price);
+          }}
         }});
       }});
 
       byYear.forEach((bucket, year) => {{
-        const medianValues = bucket.medianValues.slice().sort((a, b) => a - b);
-        const meanValues = bucket.meanValues;
-        if (!medianValues.length && !meanValues.length) return;
+        const purchaseMedianValues = bucket.purchaseMedianValues.slice().sort((a, b) => a - b);
+        const purchaseMeanValues = bucket.purchaseMeanValues;
+        const rentMedianValues = bucket.rentMedianValues.slice().sort((a, b) => a - b);
+        const rentMeanValues = bucket.rentMeanValues;
+        if (!purchaseMedianValues.length && !purchaseMeanValues.length && !rentMedianValues.length && !rentMeanValues.length) return;
+        const purchaseMedian = purchaseMedianValues.length ? median(purchaseMedianValues) : null;
+        const rentMedian = rentMedianValues.length ? median(rentMedianValues) : null;
+        const yieldMetrics = computeYieldMetrics(purchaseMedian, rentMedian);
         result.set(year, {{
-          median: medianValues.length ? median(medianValues) : null,
-          mean: meanValues.length ? mean(meanValues) : null,
-          stddev: medianValues.length ? standardDeviation(medianValues) : null,
-          recordCount: Math.max(medianValues.length, meanValues.length)
+          purchaseMedian,
+          purchaseMean: purchaseMeanValues.length ? mean(purchaseMeanValues) : null,
+          purchaseStddev: purchaseMedianValues.length ? standardDeviation(purchaseMedianValues) : null,
+          purchaseRecordCount: Math.max(purchaseMedianValues.length, purchaseMeanValues.length),
+          rentMedian,
+          rentMean: rentMeanValues.length ? mean(rentMeanValues) : null,
+          rentStddev: rentMedianValues.length ? standardDeviation(rentMedianValues) : null,
+          rentRecordCount: Math.max(rentMedianValues.length, rentMeanValues.length),
+          grossRentalYieldPct: yieldMetrics?.grossRentalYieldPct ?? null,
+          priceToRentRatio: yieldMetrics?.priceToRentRatio ?? null,
+          coverageSummary: summarizeDistinct(Array.from(bucket.coverageLevels)),
+          sourceAreaSummary: summarizeDistinct(Array.from(bucket.sourceAreas)),
+          sourceSummary: summarizeDistinct(Array.from(bucket.sources))
         }});
       }});
       return result;
     }}
 
+    function isRentBasis(priceBasis) {{
+      return String(priceBasis || "").toLowerCase().includes("rent");
+    }}
+
+    function isPurchaseBasis(priceBasis) {{
+      return !isRentBasis(priceBasis);
+    }}
+
+    function housingAvailabilityNote(hasPurchase, hasRent) {{
+      if (hasPurchase && hasRent) {{
+        return "Purchase-price and asking-rent signals are both available, so gross yield can be computed where years overlap.";
+      }}
+      if (hasRent && !hasPurchase) {{
+        return "This municipality has asking-rent fallback data but no purchase-price series, so gross yield cannot be computed.";
+      }}
+      if (hasPurchase && !hasRent) {{
+        return "This municipality has purchase-price data but no rent series, so gross yield cannot be computed.";
+      }}
+      return "No purchase-price or asking-rent series is available for the selected period.";
+    }}
+
     function renderHousingCitySummary(cityData) {{
       const latestPopulation = lastValue(cityData.yearlyRows.map(row => row.population));
-      const latestMedian = lastValue(cityData.yearlyRows.map(row => row.medianPrice));
+      const latestPurchase = lastValue(cityData.yearlyRows.map(row => row.purchaseMedian));
+      const latestRent = lastValue(cityData.yearlyRows.map(row => row.rentMedian));
+      const latestYield = lastValue(cityData.yearlyRows.map(row => row.grossRentalYieldPct));
       const housingYears = cityData.yearlyRows.filter(row => row.recordCount > 0).map(row => row.year);
       const housingYearLabel = housingYears.length ? `${{Math.min(...housingYears)}}-${{Math.max(...housingYears)}}` : "No housing years";
       elements.housingPopulationLabel.textContent = cityData.populationCity || "";
@@ -2596,16 +3688,24 @@ def build_html(payload: dict) -> str:
             <div class="housing-metric-label">Population change over selected period</div>
           </div>
           <div class="housing-metric">
-            <div class="housing-metric-value">${{latestMedian == null ? "--" : money(latestMedian)}}</div>
-            <div class="housing-metric-label">Latest median value EUR/m2</div>
+            <div class="housing-metric-value">${{latestPurchase == null ? "Unavailable" : money(latestPurchase)}}</div>
+            <div class="housing-metric-label">Latest purchase-price signal EUR/m2</div>
           </div>
           <div class="housing-metric">
             <div class="housing-metric-value">${{formatGrowthSummary(cityData.medianPriceGrowth, "money")}}</div>
-            <div class="housing-metric-label">Median price change over selected period</div>
+            <div class="housing-metric-label">Purchase-price change over selected period</div>
           </div>
           <div class="housing-metric">
-            <div class="housing-metric-value">${{formatAnnualGrowthSummary(cityData.medianPriceGrowth, "money")}}</div>
-            <div class="housing-metric-label">Estimated median price YoY</div>
+            <div class="housing-metric-value">${{latestRent == null ? "Unavailable" : money(latestRent)}}</div>
+            <div class="housing-metric-label">Latest asking rent EUR/m2/month</div>
+          </div>
+          <div class="housing-metric">
+            <div class="housing-metric-value">${{formatAnnualGrowthSummary(cityData.rentGrowth, "money")}}</div>
+            <div class="housing-metric-label">Estimated asking-rent YoY</div>
+          </div>
+          <div class="housing-metric">
+            <div class="housing-metric-value">${{latestYield == null ? "Unavailable" : signedPercent(latestYield).replace("+", "")}}</div>
+            <div class="housing-metric-label">Latest gross rental yield</div>
           </div>
           <div class="housing-metric">
             <div class="housing-metric-value">${{cityData.areaCount.toLocaleString()}}</div>
@@ -2672,17 +3772,23 @@ def build_html(payload: dict) -> str:
     }}
 
     function renderHousingStatsChart(svg, rows) {{
-      const series = [
-        {{ key: "medianPrice", label: "Median", color: colors[0] }},
-        {{ key: "meanPrice", label: "Mean", color: colors[1] }},
-        {{ key: "stddevPrice", label: "Std dev", color: colors[2] }}
-      ].map(item => ({{
+      const hasPurchase = rows.some(row => row.purchaseMedian != null || row.purchaseMean != null);
+      const seriesSpec = hasPurchase ? [
+        {{ key: "purchaseMedian", label: "Purchase median", color: colors[0] }},
+        {{ key: "purchaseMean", label: "Purchase mean", color: colors[1] }},
+        {{ key: "purchaseStddev", label: "Purchase std dev", color: colors[2] }}
+      ] : [
+        {{ key: "rentMedian", label: "Asking rent median", color: colors[0] }},
+        {{ key: "rentMean", label: "Asking rent mean", color: colors[1] }},
+        {{ key: "rentStddev", label: "Asking rent std dev", color: colors[2] }}
+      ];
+      const series = seriesSpec.map(item => ({{
         ...item,
         points: rows.filter(row => row[item.key] != null).map(row => ({{ year: row.year, value: row[item.key] }}))
       }}));
       const values = series.flatMap(item => item.points.map(point => point.value));
       if (!values.length) {{
-        drawEmptySvg(svg, "No housing price data for this period");
+        drawEmptySvg(svg, "No purchase-price or rent data for this period");
         renderHousingStatsLegend([]);
         return;
       }}
@@ -2715,7 +3821,7 @@ def build_html(payload: dict) -> str:
       renderYearTicks(svg, x, height, margin);
       svg.appendChild(line(margin.left, margin.top, margin.left, height - margin.bottom, "axis"));
       svg.appendChild(line(margin.left, height - margin.bottom, width - margin.right, height - margin.bottom, "axis"));
-      svg.appendChild(text(margin.left, margin.top - 6, "EUR/m2", "axis-label"));
+      svg.appendChild(text(margin.left, margin.top - 6, hasPurchase ? "Purchase EUR/m2" : "Rent EUR/m2/month", "axis-label"));
       svg.appendChild(text(width - margin.right, height - 6, "Year", "axis-label", "end"));
 
       series.forEach(item => {{
@@ -2730,12 +3836,87 @@ def build_html(payload: dict) -> str:
           circle.setAttribute("fill", item.color);
           circle.setAttribute("class", "series-point");
           circle.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "title")).textContent =
-            `${{housingCityLabel()}} ${{item.label}}\\n${{d.year}}: ${{money(d.value)}} EUR/m2`;
+            `${{housingCityLabel()}} ${{item.label}}\\n${{d.year}}: ${{money(d.value)}}`;
           svg.appendChild(circle);
         }});
       }});
 
       renderHousingStatsLegend(series);
+    }}
+
+    function renderHousingYieldTrendCharts(rows) {{
+      renderHousingSingleMetricChart(elements.housingYieldChart, rows, {{
+        key: "grossRentalYieldPct",
+        label: "Gross rental yield",
+        axisLabel: "Yield %",
+        color: colors[3],
+        emptyMessage: "Unavailable: purchase + rent years do not overlap",
+        valueFormatter: value => signedPercent(value).replace("+", ""),
+        tickFormatter: value => `${{numberDecimal(value, 1)}}%`
+      }});
+      renderHousingSingleMetricChart(elements.housingPriceRentChart, rows, {{
+        key: "priceToRentRatio",
+        label: "Price-to-rent ratio",
+        axisLabel: "Ratio",
+        color: colors[4],
+        emptyMessage: "Unavailable: purchase + rent years do not overlap",
+        valueFormatter: value => numberDecimal(value, 1),
+        tickFormatter: value => numberDecimal(value, 1)
+      }});
+    }}
+
+    function renderHousingSingleMetricChart(svg, rows, config) {{
+      const points = rows
+        .filter(row => row[config.key] != null && Number.isFinite(row[config.key]))
+        .map(row => ({{ year: row.year, value: row[config.key] }}));
+      if (!points.length) {{
+        drawEmptySvg(svg, config.emptyMessage);
+        return;
+      }}
+
+      const frame = svg.parentElement;
+      const frameRect = frame.getBoundingClientRect();
+      const width = Math.max(260, Math.floor(frameRect.width || svg.clientWidth || 360));
+      const height = Math.max(150, Math.floor(frameRect.height || svg.clientHeight || 180));
+      const margin = {{ top: 18, right: 18, bottom: 30, left: 58 }};
+      const plotWidth = width - margin.left - margin.right;
+      const plotHeight = height - margin.top - margin.bottom;
+      const yExtent = extent(points.map(d => d.value));
+      const yPad = (yExtent[1] - yExtent[0]) * 0.12 || Math.max(0.5, Math.abs(yExtent[0]) * 0.08);
+      const yMin = Math.max(0, yExtent[0] - yPad);
+      const yMax = yExtent[1] + yPad;
+      const xMin = state.startYear;
+      const xMax = state.endYear;
+      const x = year => margin.left + ((year - xMin) / (xMax - xMin || 1)) * plotWidth;
+      const y = value => margin.top + (1 - ((value - yMin) / (yMax - yMin || 1))) * plotHeight;
+
+      svg.setAttribute("width", width);
+      svg.setAttribute("height", height);
+      svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
+      svg.textContent = "";
+
+      ticks(yMin, yMax, 4).forEach(tick => {{
+        svg.appendChild(line(margin.left, y(tick), width - margin.right, y(tick), "grid-line"));
+        svg.appendChild(text(margin.left - 8, y(tick) + 4, config.tickFormatter(tick), "axis-label", "end"));
+      }});
+      renderYearTicks(svg, x, height, margin);
+      svg.appendChild(line(margin.left, margin.top, margin.left, height - margin.bottom, "axis"));
+      svg.appendChild(line(margin.left, height - margin.bottom, width - margin.right, height - margin.bottom, "axis"));
+      svg.appendChild(text(margin.left, margin.top - 6, config.axisLabel, "axis-label"));
+      svg.appendChild(text(width - margin.right, height - 6, "Year", "axis-label", "end"));
+
+      svg.appendChild(path(points.map(d => [x(d.year), y(d.value)]), config.color));
+      points.forEach(d => {{
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", x(d.year));
+        circle.setAttribute("cy", y(d.value));
+        circle.setAttribute("r", "3.5");
+        circle.setAttribute("fill", config.color);
+        circle.setAttribute("class", "series-point");
+        circle.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "title")).textContent =
+          `${{housingCityLabel()}} ${{config.label}}\\n${{d.year}}: ${{config.valueFormatter(d.value)}}`;
+        svg.appendChild(circle);
+      }});
     }}
 
     function renderYearTicks(svg, x, height, margin) {{
@@ -2765,11 +3946,12 @@ def build_html(payload: dict) -> str:
           <td>${{row.population == null ? "--" : number(row.population)}}</td>
           <td>${{row.populationYoyChange == null ? "--" : signedNumber(row.populationYoyChange)}}</td>
           <td>${{row.populationYoy == null ? "--" : signedPercent(row.populationYoy)}}</td>
-          <td>${{row.medianPrice == null ? "--" : money(row.medianPrice)}}</td>
-          <td>${{row.meanPrice == null ? "--" : money(row.meanPrice)}}</td>
-          <td>${{row.stddevPrice == null ? "--" : money(row.stddevPrice)}}</td>
-          <td>${{row.medianPriceYoyChange == null ? "--" : signedMoney(row.medianPriceYoyChange)}}</td>
-          <td>${{row.medianPriceYoy == null ? "--" : signedPercent(row.medianPriceYoy)}}</td>
+          <td>${{row.purchaseMedian == null ? "Unavailable" : money(row.purchaseMedian)}}</td>
+          <td>${{row.rentMedian == null ? "Unavailable" : money(row.rentMedian)}}</td>
+          <td>${{row.grossRentalYieldPct == null ? "Unavailable" : signedPercent(row.grossRentalYieldPct).replace("+", "")}}</td>
+          <td>${{row.priceToRentRatio == null ? "Unavailable" : numberDecimal(row.priceToRentRatio, 1)}}</td>
+          <td>${{row.purchaseYoy == null ? "Unavailable" : signedPercent(row.purchaseYoy)}}</td>
+          <td>${{row.rentYoy == null ? "Unavailable" : signedPercent(row.rentYoy)}}</td>
         `;
         fragment.appendChild(tr);
       }});
@@ -2908,6 +4090,14 @@ def build_html(payload: dict) -> str:
       return `${{unique.slice(0, 2).join(" + ")}} + ${{unique.length - 2}} more`;
     }}
 
+    function clamp(value, min, max) {{
+      return Math.max(min, Math.min(max, value));
+    }}
+
+    function scoreText(value, missingLabel = "Unavailable") {{
+      return value == null || !Number.isFinite(value) ? missingLabel : numberDecimal(value, 1);
+    }}
+
     function formatGrowthSummary(metrics, kind) {{
       if (!metrics || !metrics.valid) return "Insufficient data";
       const absolute = kind === "money" ? signedMoney(metrics.absChange) : signedNumber(metrics.absChange);
@@ -2927,6 +4117,11 @@ def build_html(payload: dict) -> str:
       return `${{signedMoney(row.medianPriceAnnualChange)}}/yr (${{signedPercent(row.medianPriceCagr)}})`;
     }}
 
+    function formatSignalYoY(row) {{
+      if (row.signalCagr == null || row.signalAnnualChange == null) return "--";
+      return `${{signedMoney(row.signalAnnualChange)}}/yr (${{signedPercent(row.signalCagr)}})`;
+    }}
+
     function priceYoYTitle(row) {{
       if (row.medianPriceCagr == null || row.medianPriceAnnualChange == null) {{
         return "Insufficient housing price data for the selected years.";
@@ -2935,6 +4130,18 @@ def build_html(payload: dict) -> str:
         `Estimated annualized median housing price change: ${{signedMoney(row.medianPriceAnnualChange)}} per m2 per year`,
         `Annualized YoY: ${{signedPercent(row.medianPriceCagr)}}`,
         `Total selected-period median price change: ${{signedPercent(row.medianPriceGrowth)}}`
+      ].join(". ");
+    }}
+
+    function signalYoYTitle(row) {{
+      if (row.signalCagr == null || row.signalAnnualChange == null) {{
+        return "Insufficient signal data for the selected years.";
+      }}
+      return [
+        `${{row.signalBasis}} signal`,
+        `Estimated annualized change: ${{signedMoney(row.signalAnnualChange)}} per m2 per year`,
+        `Annualized YoY: ${{signedPercent(row.signalCagr)}}`,
+        `Total selected-period change: ${{signedPercent(row.signalGrowth)}}`
       ].join(". ");
     }}
 
@@ -2950,6 +4157,14 @@ def build_html(payload: dict) -> str:
 
     function number(value) {{
       return Math.round(value).toLocaleString();
+    }}
+
+    function numberDecimal(value, digits = 1) {{
+      if (value == null || !Number.isFinite(value)) return "--";
+      return Number(value).toLocaleString("en", {{
+        minimumFractionDigits: 0,
+        maximumFractionDigits: digits
+      }});
     }}
 
     function signedNumber(value) {{
