@@ -1,0 +1,9 @@
+[project]
+name = "housing-growth-lab"
+version = "0.1.0"
+description = "City-level German housing-market growth analysis and trend classification."
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+housing-growth = "housing_growth.cli:main"
